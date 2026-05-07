@@ -41,6 +41,24 @@ vim.keymap.set("n", "<leader>mq", function() require("md-preview").close() end)
 
 While open, `BufWritePost` re-renders, `CursorMoved` syncs scroll (debounced), `BufWipeout` of the previewed file closes the server.
 
+## CLI install (no Neovim required)
+
+One-liner:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview.nvim/main/install.sh | sh
+```
+
+This clones the repo to `~/.local/share/md-preview` and symlinks `~/.local/bin/mdp`. Override the prefix with `PREFIX=...`:
+
+```sh
+PREFIX=/usr/local sh install.sh   # system-wide
+```
+
+Update later with `git -C ~/.local/share/md-preview pull` (or re-run the installer).
+
+The Neovim plugin already auto-symlinks `mdp` on `setup()`, so plugin users don't need this.
+
 ## CLI usage
 
 ```sh
