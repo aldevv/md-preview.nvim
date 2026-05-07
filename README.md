@@ -62,10 +62,17 @@ The Neovim plugin already auto-symlinks `mdp` on `setup()`, so plugin users don'
 ## CLI usage
 
 ```sh
+mdp                        # fzf-pick a .md from cwd, then preview
 mdp README.md              # render + open in browser
+mdp -e README.md           # preview AND open the file in nvim
+mdp -e                     # fzf-pick, preview, and edit
 mdp -t light README.md     # light theme
 mdp -p README.md           # print HTML path, don't open browser
 ```
+
+If `fzf` is not installed and you run `mdp` with no file argument, it prints `--help` plus a note about installing fzf.
+
+`-e` opens nvim after spawning the browser preview (the preview is static — re-run `mdp` if you want it to reflect new edits, or use the Neovim plugin's live-sync command instead).
 
 ### Config — `~/.config/md-preview/config.toml`
 
@@ -78,6 +85,7 @@ custom_css = "~/path.css"    # appended after defaults; cascade wins
 browser    = "auto"          # "auto" | "firefox --new-window" | ["cmd", "arg"]
                              # The URL is appended as the last arg.
                              # auto = chrome --app= → xdg-open / open
+edit       = false           # default for -e (also open nvim). Override with -e / --no-edit.
 ```
 
 CLI flags override config values.
