@@ -85,8 +85,8 @@ CLI flags override config values.
 ## Requirements
 
 - Python 3.11+ (for `tomllib`; older Python still works for the plugin, just not the CLI's TOML config).
-- A Chromium-based browser, or any browser via `browser = "..."`.
-- `xdotool` or `wmctrl` on Linux for closing the preview window cleanly (optional).
+- Any web browser. If `google-chrome` / `chromium` is on `PATH`, `mdp` uses it with `--app=` for a chromeless window; otherwise it falls back to `xdg-open` (Linux) or `open` (macOS) — your default browser. Override with `browser = "firefox --new-window"` or `browser = ["qutebrowser"]` in the config.
+- `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional, plugin only).
 
 ## Layout
 
