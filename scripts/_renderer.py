@@ -105,7 +105,7 @@ body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.6;
   padding: 32px;
   max-width: 900px;
