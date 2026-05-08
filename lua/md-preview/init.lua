@@ -108,7 +108,10 @@ function M.install_cli()
   end
 
   if vim.fn.resolve(link) == target then return end
-  pcall(vim.fn.system, { "ln", "-sf", target, link })
+  local out = vim.fn.system({ "ln", "-sf", target, link })
+  if vim.v.shell_error ~= 0 then
+    err("ln -sf " .. link .. " failed: " .. (out or ""))
+  end
 end
 
 -- ── Server health check ───────────────────────────────────────────────────
