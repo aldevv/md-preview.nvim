@@ -80,13 +80,11 @@ function M.setup(opts)
 end
 
 -- ── CLI install ──────────────────────────────────────────────────────────
--- Symlink ~/.local/bin/mdp → <plugin>/scripts/mdp so the CLI is on PATH
--- once the plugin is loaded. No-op if the symlink already points to the
--- right place.
+-- Ensure the `mdp` Go binary exists in the plugin dir, then symlink
+-- ~/.local/bin/mdp → <plugin>/mdp. If the binary is missing, build it from
+-- source when `go` is available; otherwise leave a breadcrumb for the user.
 function M.install_cli()
-  local target = _plugin_dir .. "/scripts/mdp"
-  if vim.fn.filereadable(target) == 0 then return end
-
+  local target = _plugin_dir .. "/mdp"
   local link_dir = vim.fn.expand("~/.local/bin")
   local link = link_dir .. "/mdp"
 
@@ -94,9 +92,22 @@ function M.install_cli()
     vim.fn.mkdir(link_dir, "p")
   end
 
-  -- Already linked correctly?
-  if vim.fn.resolve(link) == target then return end
+  if vim.fn.executable(target) == 0 then
+    if vim.fn.executable("go") == 0 then
+      if vim.fn.executable("mdp") == 0 then
+        err("mdp binary not found. Run install.sh or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
+      end
+      return
+    end
+    info("Building mdp binary…")
+    local out = vim.fn.system({ "go", "build", "-C", _plugin_dir, "-o", target, "./cmd/mdp" })
+    if vim.v.shell_error ~= 0 then
+      err("go build failed: " .. (out or ""))
+      return
+    end
+  end
 
+  if vim.fn.resolve(link) == target then return end
   pcall(vim.fn.system, { "ln", "-sf", target, link })
 end
 
@@ -178,7 +189,7 @@ end
 
 -- ── Port conflict recovery ───────────────────────────────────────────────
 
--- Finds PIDs of md-preview-server.py processes bound to `port` and kills them.
+-- Finds PIDs of `mdp serve` processes bound to `port` and kills them.
 -- Scoped to our own server's command line so we never kill an unrelated
 -- process that happens to share the port.
 local function clear_stale_server(port)
@@ -187,7 +198,7 @@ local function clear_stale_server(port)
   local killed = {}
   for pid in pids_str:gmatch("%d+") do
     local cmdline = vim.fn.system("ps -o cmd= -p " .. pid .. " 2>/dev/null")
-    if cmdline:match("md%-preview%-server%.py") then
+    if cmdline:match("mdp%s+serve") then
       vim.fn.system("kill " .. pid)
       table.insert(killed, pid)
     end
@@ -311,12 +322,15 @@ function M.open(theme)
   -- was reloaded without close()), kill it before binding.
   clear_stale_server(M.state.port)
 
-  local server_script = _plugin_dir .. "/scripts/md-preview-server.py"
-  local venv_python = vim.fn.expand("~/.local/share/nvim/md-preview-venv/bin/python3")
-  local python = vim.fn.filereadable(venv_python) == 1 and venv_python or "python3"
+  local plugin_bin = _plugin_dir .. "/mdp"
+  local mdp = vim.fn.executable(plugin_bin) == 1 and plugin_bin or "mdp"
+  if vim.fn.executable(mdp) == 0 then
+    err("mdp binary not found. Run install.sh or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
+    return
+  end
 
   M.state.job_id = vim.fn.jobstart(
-    { python, server_script, file, tostring(M.state.port), theme },
+    { mdp, "serve", file, tostring(M.state.port), theme },
     {
       stdin = "pipe",
       stdout_buffered = false,

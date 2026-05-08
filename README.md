@@ -1,13 +1,14 @@
 # md-preview.nvim
 
-Scroll-synced markdown preview for Neovim, plus a standalone `mdp` CLI for one-shot rendering — both backed by `markdown-it-py` and a single shared renderer.
+Scroll-synced markdown preview for Neovim, plus a standalone `mdp` CLI for one-shot rendering — both backed by [goldmark](https://github.com/yuin/goldmark) and shipped as a single Go binary.
 
 ## Features
 
 - Live preview that follows your cursor and re-renders on save (Neovim plugin).
 - Standalone `mdp` CLI: `mdp file.md` opens a static rendered HTML in Chrome `--app=` (or your browser of choice).
-- Self-bootstrapping Python venv — no global pip installs required.
-- Dark / light themes, GitHub-flavored markdown, task lists, syntax highlighting via highlight.js.
+- Single static binary — no Python, no pip, no venv.
+- Vim-style scroll bindings in the rendered page: `j`/`k`, `h`/`l`, `d`/`u` (half-page), `g`/`G` (top/bottom).
+- Dark / light themes, GitHub-flavored markdown (tables, strikethrough, autolink, task lists), syntax highlighting via highlight.js.
 - Frontmatter is stripped, not rendered.
 
 ## Install (lazy.nvim)
@@ -22,7 +23,7 @@ Scroll-synced markdown preview for Neovim, plus a standalone `mdp` CLI for one-s
 }
 ```
 
-The plugin auto-symlinks `~/.local/bin/mdp` to the bundled CLI on `setup()`.
+On `setup()`, the plugin builds the `mdp` binary (`go build`) into the plugin dir if it isn't there yet, then symlinks `~/.local/bin/mdp` to it. Requires Go on PATH for the build step; alternatively, install the binary first via the one-liner below.
 
 ## Plugin usage
 
@@ -43,21 +44,25 @@ While open, `BufWritePost` re-renders, `CursorMoved` syncs scroll (debounced), `
 
 ## CLI install (no Neovim required)
 
-One-liner:
+One-liner — uses `go install` if Go is on PATH, otherwise downloads a prebuilt release binary:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview.nvim/main/install.sh | sh
 ```
 
-This clones the repo to `~/.local/share/md-preview` and symlinks `~/.local/bin/mdp`. Override the prefix with `PREFIX=...`:
+Override the prefix with `PREFIX=...` (default `$HOME/.local`):
 
 ```sh
 PREFIX=/usr/local sh install.sh   # system-wide
 ```
 
-Update later with `git -C ~/.local/share/md-preview pull` (or re-run the installer).
+Or directly with Go:
 
-The Neovim plugin already auto-symlinks `mdp` on `setup()`, so plugin users don't need this.
+```sh
+go install github.com/aldevv/md-preview/cmd/mdp@latest
+```
+
+The Neovim plugin builds the binary on `setup()` (when Go is available), so plugin users typically don't need either of the above.
 
 ## CLI usage
 
@@ -70,7 +75,7 @@ mdp -t light README.md     # light theme
 mdp -p README.md           # print HTML path, don't open browser
 ```
 
-If `fzf` is not installed and you run `mdp` with no file argument, it prints `--help` plus a note about installing fzf.
+If `fzf` is not installed and you run `mdp` with no file argument, it prints usage plus a note about installing fzf.
 
 `-e` opens nvim after spawning the browser preview (the preview is static — re-run `mdp` if you want it to reflect new edits, or use the Neovim plugin's live-sync command instead).
 
@@ -92,17 +97,18 @@ CLI flags override config values.
 
 ## Requirements
 
-- Python 3.11+ (for `tomllib`; older Python still works for the plugin, just not the CLI's TOML config).
+- Go 1.22+ (only for building from source; users on releases don't need it).
 - Any web browser. If `google-chrome` / `chromium` is on `PATH`, `mdp` uses it with `--app=` for a chromeless window; otherwise it falls back to `xdg-open` (Linux) or `open` (macOS) — your default browser. Override with `browser = "firefox --new-window"` or `browser = ["qutebrowser"]` in the config.
 - `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional, plugin only).
 
 ## Layout
 
 ```
-lua/md-preview/init.lua          -- nvim plugin (server lifecycle, autocmds, IPC)
-scripts/_renderer.py             -- shared rendering: venv bootstrap, render_body, build_page
-scripts/md-preview-server.py     -- HTTP + WebSocket server for the plugin
-scripts/mdp                      -- CLI entrypoint
+cmd/mdp/main.go              -- CLI entrypoint + `mdp serve` subcommand
+internal/render              -- markdown → HTML body + page template
+internal/server              -- HTTP + WebSocket server for the plugin
+internal/config              -- TOML config, browser detection, fzf picker
+lua/md-preview/init.lua      -- nvim plugin (server lifecycle, autocmds, IPC)
 ```
 
-The plugin and CLI share `_renderer.py` so themes, CSS, and markdown rules stay in sync.
+The plugin spawns the server via `mdp serve <file> <port> <theme>` and communicates over JSON-on-stdin.
