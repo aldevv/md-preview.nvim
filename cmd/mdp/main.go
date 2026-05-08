@@ -15,10 +15,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 
 	"github.com/aldevv/md-preview/internal/config"
 	"github.com/aldevv/md-preview/internal/render"
+	"github.com/aldevv/md-preview/internal/server"
 )
 
 // Environment groups the OS-touching dependencies of run so tests can fake
@@ -75,8 +77,7 @@ Flags:
 // run executes the CLI with the given args and IO. Returns the exit code.
 func run(args []string, _ io.Reader, stdout, stderr io.Writer, env Environment) int {
 	if len(args) > 0 && args[0] == "serve" {
-		fmt.Fprintln(stderr, "mdp: serve subcommand not yet wired (will be added by coordinator)")
-		return 2
+		return runServe(args[1:], stderr)
 	}
 
 	fs := flag.NewFlagSet("mdp", flag.ContinueOnError)
@@ -244,4 +245,23 @@ func spawnDetached(argv []string) error {
 	cmd.Stdin = nil
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	return cmd.Start()
+}
+
+// runServe handles `mdp serve <file> <port> <theme>`. The Lua plugin spawns
+// this and communicates over JSON-on-stdin; see internal/server.
+func runServe(args []string, stderr io.Writer) int {
+	if len(args) < 3 {
+		fmt.Fprintln(stderr, "Usage: mdp serve <file> <port> <theme>")
+		return 1
+	}
+	port, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "mdp serve: invalid port %q\n", args[1])
+		return 1
+	}
+	if err := server.Run(args[0], port, args[2]); err != nil {
+		fmt.Fprintf(stderr, "mdp serve: %v\n", err)
+		return 1
+	}
+	return 0
 }

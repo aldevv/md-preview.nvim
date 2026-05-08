@@ -153,15 +153,27 @@ func TestRun_EditAndNoEdit_Conflict(t *testing.T) {
 	}
 }
 
-func TestRun_ServeSubcommand_Placeholder(t *testing.T) {
+func TestRun_ServeSubcommand_TooFewArgs(t *testing.T) {
 	var out, errb bytes.Buffer
 	env := testEnv(t)
-	code := run([]string{"serve", "f", "1", "dark"}, nil, &out, &errb, env)
-	if code != 2 {
-		t.Fatalf("exit code = %d, want 2", code)
+	code := run([]string{"serve", "file.md"}, nil, &out, &errb, env)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if !strings.Contains(errb.String(), "serve subcommand not yet wired") {
-		t.Fatalf("stderr = %q, want serve placeholder", errb.String())
+	if !strings.Contains(errb.String(), "Usage: mdp serve") {
+		t.Fatalf("stderr = %q, want serve usage", errb.String())
+	}
+}
+
+func TestRun_ServeSubcommand_InvalidPort(t *testing.T) {
+	var out, errb bytes.Buffer
+	env := testEnv(t)
+	code := run([]string{"serve", "file.md", "notaport", "dark"}, nil, &out, &errb, env)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(errb.String(), "invalid port") {
+		t.Fatalf("stderr = %q, want invalid port", errb.String())
 	}
 }
 
