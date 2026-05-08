@@ -123,3 +123,33 @@ func TestWSHandshake_Accept(t *testing.T) {
 		t.Errorf("wsAccept = %q, want %q", got, want)
 	}
 }
+
+func TestWSFrame_DecodeOversized(t *testing.T) {
+	frame := []byte{0x81, 0x7F}
+	ext := make([]byte, 8)
+	binary.BigEndian.PutUint64(ext, uint64(maxFrameSize)+1)
+	frame = append(frame, ext...)
+	op, payload := wsReadFrame(bytes.NewReader(frame))
+	if op != 8 {
+		t.Errorf("opcode = %d, want 8 on oversize frame", op)
+	}
+	if len(payload) != 0 {
+		t.Errorf("payload len = %d, want 0", len(payload))
+	}
+}
+
+func TestWSFrame_DecodeOversized_NegativeWraparound(t *testing.T) {
+	frame := []byte{0x81, 0x7F}
+	ext := make([]byte, 8)
+	binary.BigEndian.PutUint64(ext, ^uint64(0))
+	frame = append(frame, ext...)
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("wsReadFrame panicked on uint64 max length: %v", r)
+		}
+	}()
+	op, _ := wsReadFrame(bytes.NewReader(frame))
+	if op != 8 {
+		t.Errorf("opcode = %d, want 8", op)
+	}
+}

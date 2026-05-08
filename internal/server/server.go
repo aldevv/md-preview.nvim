@@ -30,7 +30,6 @@ type state struct {
 	wsClients     map[net.Conn]struct{}
 }
 
-// newState constructs a state with the given initial file, port, and theme.
 func newState(file string, port int, theme string) *state {
 	return &state{
 		file:      file,
@@ -57,14 +56,12 @@ func (s *state) doRender() int {
 	return v
 }
 
-// addClient registers a connected WebSocket client.
 func (s *state) addClient(c net.Conn) {
 	s.mu.Lock()
 	s.wsClients[c] = struct{}{}
 	s.mu.Unlock()
 }
 
-// removeClient unregisters a WebSocket client.
 func (s *state) removeClient(c net.Conn) {
 	s.mu.Lock()
 	delete(s.wsClients, c)
@@ -225,7 +222,8 @@ func handleWS(s *state, w http.ResponseWriter, r *http.Request) {
 }
 
 // readJSONBody decodes the request body into a string-keyed map. Empty or
-// invalid bodies yield an empty map (mirrors the Python lenient parsing).
+// invalid bodies yield an empty map so a malformed POST still flows through
+// the handler instead of erroring out — keys are looked up defensively.
 func readJSONBody(r *http.Request) map[string]any {
 	out := map[string]any{}
 	if r.Body == nil {

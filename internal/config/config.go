@@ -1,7 +1,7 @@
-// Package config loads and applies the mdp TOML configuration. It is a
-// straight port of the Python mdp config helpers; behavior is intended to
-// match the original (silent on missing config, warnings on malformed
-// values, identical CSS output and browser command shape).
+// Package config loads the mdp TOML configuration and the small helpers
+// (browser command resolution, fzf picker, extra CSS) that consume it.
+// A missing config file is silent; malformed values produce warnings on
+// the supplied error writer rather than failing the run.
 package config
 
 import (
@@ -59,8 +59,7 @@ func Load() (Config, error) {
 }
 
 // ExpandTilde replaces a leading "~/" with the user's home directory. Bare
-// "~" and other inputs are returned unchanged. Matches what the Python code
-// actually relies on (it never feeds ~user paths through here).
+// "~" and other inputs are returned unchanged.
 func ExpandTilde(p string) string {
 	if !strings.HasPrefix(p, "~/") {
 		return p

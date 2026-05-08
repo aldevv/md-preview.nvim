@@ -25,11 +25,10 @@ import (
 // dataLineAttr is the attribute name browsers use to scroll-sync to a source line.
 var dataLineAttr = []byte("data-line")
 
-// newMarkdown returns a goldmark instance configured with GFM (Tables,
-// Strikethrough, Linkify, TaskList) — matching the Python markdown-it-py
-// "gfm-like" preset plus linkify and tasklists. The thematic-break parser
-// is replaced with a wrapper that records the source line on the AST node
-// because goldmark's default does not populate Lines() for HRs.
+// newMarkdown returns a goldmark instance configured with GFM. The
+// thematic-break and fenced-code parsers are wrapped to record the source
+// line on the AST node — goldmark's defaults don't populate Lines() for HRs,
+// and fenced code's Lines() skip the opening fence.
 func newMarkdown() goldmark.Markdown {
 	return goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -46,10 +45,9 @@ func newMarkdown() goldmark.Markdown {
 	)
 }
 
-// dataLineRenderer overrides goldmark's default HTML rendering for the block
-// kinds whose default funcs ignore node attributes (fenced and indented
-// code blocks). It writes the data-line attribute and then emits the
-// normal output via writeLines.
+// dataLineRenderer overrides goldmark's default HTML rendering for the
+// block kinds whose default funcs ignore node attributes (fenced and
+// indented code blocks, and raw HTML blocks).
 type dataLineRenderer struct {
 	html.Config
 }
@@ -65,6 +63,7 @@ func (d *dataLineRenderer) SetOption(name renderer.OptionName, value any) {
 func (d *dataLineRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindFencedCodeBlock, d.renderFencedCodeBlock)
 	reg.Register(ast.KindCodeBlock, d.renderCodeBlock)
+	reg.Register(ast.KindHTMLBlock, d.renderHTMLBlock)
 }
 
 func writeDataLineAttr(w util.BufWriter, n ast.Node) {
@@ -120,6 +119,36 @@ func (d *dataLineRenderer) renderCodeBlock(w util.BufWriter, source []byte, n as
 	return ast.WalkContinue, nil
 }
 
+// renderHTMLBlock mirrors goldmark's default unsafe HTML-block rendering but
+// wraps the raw lines in <div data-line="N">…</div> when an annotation is
+// present, so the scroll-sync client gets an anchor it can lerp against.
+// Without an annotation it emits the raw HTML verbatim, matching the default.
+func (d *dataLineRenderer) renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	n := node.(*ast.HTMLBlock)
+	_, hasLine := n.Attribute(dataLineAttr)
+	if entering {
+		if hasLine {
+			_, _ = w.WriteString("<div")
+			writeDataLineAttr(w, node)
+			_, _ = w.WriteString(">\n")
+		}
+		l := n.Lines().Len()
+		for i := 0; i < l; i++ {
+			line := n.Lines().At(i)
+			_, _ = w.Write(line.Value(source))
+		}
+	} else {
+		if n.HasClosure() {
+			closure := n.ClosureLine
+			_, _ = w.Write(closure.Value(source))
+		}
+		if hasLine {
+			_, _ = w.WriteString("</div>\n")
+		}
+	}
+	return ast.WalkContinue, nil
+}
+
 // lineRecorder wraps a BlockParser to stamp data-line on the opened node
 // using the reader's position at Open time. Used for kinds whose Lines()
 // don't include the opening line (e.g. thematic break, fenced code fence).
@@ -149,9 +178,9 @@ func (h *lineRecorder) Close(node ast.Node, reader text.Reader, pc parser.Contex
 func (h *lineRecorder) CanInterruptParagraph() bool { return h.inner.CanInterruptParagraph() }
 func (h *lineRecorder) CanAcceptIndentedLine() bool { return h.inner.CanAcceptIndentedLine() }
 
-// stripFrontmatter mirrors the Python _strip_frontmatter: if the first line
-// is "---", drop everything through the next "---" line. If no closing "---"
-// is found, return content unchanged.
+// stripFrontmatter drops a leading YAML frontmatter block: if the first line
+// is "---", strip through the next "---" line. If no closing "---" is found,
+// return content unchanged.
 func stripFrontmatter(content string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
@@ -214,8 +243,6 @@ func firstSourceOffset(n ast.Node) int {
 	return -1
 }
 
-// shouldAnnotate matches the block kinds the Python renderer annotates:
-// any *_open token plus standalone fence/hr/html_block/table.
 func shouldAnnotate(n ast.Node) bool {
 	switch n.Kind() {
 	case ast.KindHeading,
@@ -228,7 +255,10 @@ func shouldAnnotate(n ast.Node) bool {
 		ast.KindThematicBreak,
 		ast.KindHTMLBlock:
 		return true
-	case extast.KindTable:
+	case extast.KindTable,
+		extast.KindTableHeader,
+		extast.KindTableRow,
+		extast.KindTableCell:
 		return true
 	}
 	return false

@@ -86,6 +86,46 @@ func TestRenderTable(t *testing.T) {
 	}
 }
 
+func TestRenderTable_RowAndCellAnnotated(t *testing.T) {
+	src := "| A | B |\n| - | - |\n| 1 | 2 |\n"
+	out := RenderBytes([]byte(src))
+	for _, want := range []string{"<th", "<td", "<tr"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output: %q", want, out)
+		}
+	}
+	count := strings.Count(out, "data-line=")
+	if count < 5 {
+		t.Errorf("expected data-line on table, header, row(s), cells (>=5); got %d in %q", count, out)
+	}
+}
+
+func TestRenderListItems_EachItemAnnotated(t *testing.T) {
+	src := "- one\n- two\n- three\n"
+	out := RenderBytes([]byte(src))
+	for _, want := range []string{`data-line="1"`, `data-line="2"`, `data-line="3"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in list output: %q", want, out)
+		}
+	}
+}
+
+func TestRenderHTMLBlock_DataLineWrapped(t *testing.T) {
+	src := "para\n\n<details>\n<summary>x</summary>\nhi\n</details>\n"
+	out := RenderBytes([]byte(src))
+	if !strings.Contains(out, "<details>") {
+		t.Fatalf("raw HTML missing in output: %q", out)
+	}
+	if !strings.Contains(out, `<div data-line="3">`) {
+		t.Errorf(`expected <div data-line="3"> wrapper around HTML block; got: %q`, out)
+	}
+	wrapStart := strings.Index(out, `<div data-line="3">`)
+	htmlStart := strings.Index(out, "<details>")
+	if wrapStart < 0 || htmlStart < 0 || wrapStart > htmlStart {
+		t.Errorf("wrapper must precede the raw HTML in output: %q", out)
+	}
+}
+
 func TestRenderTaskList(t *testing.T) {
 	src := "- [x] done\n- [ ] todo\n"
 	out := RenderBytes([]byte(src))

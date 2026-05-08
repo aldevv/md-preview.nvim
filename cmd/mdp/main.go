@@ -1,7 +1,9 @@
 // Command mdp renders a markdown file to HTML and opens it in a browser.
 //
 // One-shot static preview: writes HTML to a stable temp file (sha1 of the
-// input path) and launches a browser. Mirrors the Python scripts/mdp CLI.
+// input path so re-runs overwrite) and launches a browser. The `mdp serve`
+// subcommand starts the long-running preview server consumed by the
+// Neovim plugin.
 package main
 
 import (
@@ -23,8 +25,8 @@ import (
 	"github.com/aldevv/md-preview/internal/server"
 )
 
-// Environment groups the OS-touching dependencies of run so tests can fake
-// them. Production wiring lives in realEnv.
+// Environment is the seam between run() and the OS — production wires it
+// up via realEnv, tests substitute fakes.
 type Environment struct {
 	LookPath func(string) (string, error)
 	GOOS     string
@@ -98,8 +100,6 @@ func run(args []string, _ io.Reader, stdout, stderr io.Writer, env Environment) 
 		return 1
 	}
 
-	// Track which forms were explicitly passed so -e and --no-edit can
-	// be reliably distinguished from defaults.
 	editSet, noEditSet := false, false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {

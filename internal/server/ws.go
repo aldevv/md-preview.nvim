@@ -12,6 +12,12 @@ import (
 // Sec-WebSocket-Accept response header from the client's nonce.
 const wsMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+// maxFrameSize caps the payload size of an inbound WS frame. The server is
+// loopback-only and only ever exchanges tiny JSON commands, so anything
+// larger is malformed or hostile. A bound is required because the 64-bit
+// length form would otherwise overflow int and panic make([]byte).
+const maxFrameSize = 1 << 20 // 1 MiB
+
 // wsAccept computes the Sec-WebSocket-Accept response value for a given
 // Sec-WebSocket-Key request header.
 func wsAccept(key string) string {
@@ -58,8 +64,8 @@ func recvExact(r io.Reader, n int) ([]byte, error) {
 }
 
 // wsReadFrame reads a single WebSocket frame from r and returns
-// (opcode, payload). On any error or short read it returns (8, nil) to
-// signal a close, mirroring the Python reference implementation.
+// (opcode, payload). On any error, short read, or oversized frame it
+// returns (8, nil) so the caller treats it as a close.
 func wsReadFrame(r io.Reader) (byte, []byte) {
 	header, err := recvExact(r, 2)
 	if err != nil || len(header) < 2 {
@@ -80,6 +86,9 @@ func wsReadFrame(r io.Reader) (byte, []byte) {
 			return 8, nil
 		}
 		length = binary.BigEndian.Uint64(ext)
+	}
+	if length > maxFrameSize {
+		return 8, nil
 	}
 
 	masked := header[1]&0x80 != 0
