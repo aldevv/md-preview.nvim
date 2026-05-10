@@ -2,15 +2,21 @@
 -- Single-instance: open → server + Chrome window
 --                  re-open → replace content, no new server/window
 
--- Resolve plugin root: lua/md-preview/init.lua → ../../ → plugin root
-local _plugin_dir = vim.fn.fnamemodify(
-  debug.getinfo(1, "S").source:sub(2), ":h:h:h"
-)
-
 local M = {}
+
+-- Default leader keymaps registered on setup() unless opts.keymaps == false.
+-- Pass a partial table to override individual entries; missing keys keep
+-- their defaults. Set any value to false to skip just that one binding.
+local DEFAULT_KEYMAPS = {
+  open_dark  = "<leader>mv",
+  open_light = "<leader>mV",
+  close      = "<leader>mq",
+}
 
 M.opts = {
   auto_position = true,   -- resize/reposition terminal + browser side-by-side
+  keymaps       = true,   -- true = defaults | false = none | table = overrides
+  colemak       = false,  -- swap in-page nav keys j/k/l → n/e/i
 }
 
 M.state = {
@@ -65,6 +71,28 @@ local function detect_wm()
   return nil
 end
 
+-- resolve_keymaps merges the user's `keymaps` opt (true | false | table)
+-- against DEFAULT_KEYMAPS. Returns nil when registration should be skipped.
+local function resolve_keymaps(km)
+  if km == false then return nil end
+  if km == nil or km == true then return DEFAULT_KEYMAPS end
+  if type(km) ~= "table" then
+    err("opts.keymaps must be true, false, or a table — got " .. type(km))
+    return DEFAULT_KEYMAPS
+  end
+  return vim.tbl_extend("force", DEFAULT_KEYMAPS, km)
+end
+
+local function register_keymaps(km)
+  local map = function(lhs, rhs, desc)
+    if not lhs then return end
+    vim.keymap.set("n", lhs, rhs, { silent = true, desc = desc })
+  end
+  map(km.open_dark,  function() M.open("dark")  end, "md-preview: open (dark)")
+  map(km.open_light, function() M.open("light") end, "md-preview: open (light)")
+  map(km.close,      function() M.close()       end, "md-preview: close")
+end
+
 function M.setup(opts)
   M.opts = vim.tbl_extend("force", M.opts, opts or {})
 
@@ -76,42 +104,41 @@ function M.setup(opts)
     M.state.wm = detect_wm()
   end
 
+  local km = resolve_keymaps(M.opts.keymaps)
+  if km then register_keymaps(km) end
+
   M.install_cli()
 end
 
 -- ── CLI install ──────────────────────────────────────────────────────────
--- Ensure the `mdp` Go binary exists in the plugin dir, then symlink
--- ~/.local/bin/mdp → <plugin>/mdp. If the binary is missing, build it from
--- source when `go` is available; otherwise leave a breadcrumb for the user.
+-- The `mdp` binary lives in a separate repo (github.com/aldevv/md-preview).
+-- If it's already on PATH, do nothing. Otherwise, when Go is available,
+-- run `go install github.com/aldevv/md-preview/cmd/mdp@latest` with
+-- GOBIN=~/.local/bin so the binary lands at a stable, known location.
+-- When neither is available, leave a breadcrumb pointing at the install
+-- script.
 function M.install_cli()
-  local target = _plugin_dir .. "/mdp"
-  local link_dir = vim.fn.expand("~/.local/bin")
-  local link = link_dir .. "/mdp"
+  if vim.fn.executable("mdp") == 1 then return end
 
+  local link_dir = vim.fn.expand("~/.local/bin")
   if vim.fn.isdirectory(link_dir) == 0 then
     vim.fn.mkdir(link_dir, "p")
   end
 
-  if vim.fn.executable(target) == 0 then
-    if vim.fn.executable("go") == 0 then
-      if vim.fn.executable("mdp") == 0 then
-        err("mdp binary not found. Run install.sh or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
-      end
-      return
-    end
-    info("Building mdp binary…")
-    local out = vim.fn.system({ "go", "build", "-C", _plugin_dir, "-o", target, "./cmd/mdp" })
+  if vim.fn.executable("go") == 1 then
+    info("Installing mdp via `go install`…")
+    local out = vim.fn.system({
+      "env", "GOBIN=" .. link_dir,
+      "go", "install", "github.com/aldevv/md-preview/cmd/mdp@latest",
+    })
     if vim.v.shell_error ~= 0 then
-      err("go build failed: " .. (out or ""))
+      err("go install failed: " .. (out or ""))
       return
     end
+    return
   end
 
-  if vim.fn.resolve(link) == target then return end
-  local out = vim.fn.system({ "ln", "-sf", target, link })
-  if vim.v.shell_error ~= 0 then
-    err("ln -sf " .. link .. " failed: " .. (out or ""))
-  end
+  err("mdp binary not found. Install via `curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh` or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
 end
 
 -- ── Server health check ───────────────────────────────────────────────────
@@ -325,12 +352,14 @@ function M.open(theme)
   -- was reloaded without close()), kill it before binding.
   clear_stale_server(M.state.port)
 
-  local plugin_bin = _plugin_dir .. "/mdp"
-  local mdp = vim.fn.executable(plugin_bin) == 1 and plugin_bin or "mdp"
-  if vim.fn.executable(mdp) == 0 then
-    err("mdp binary not found. Run install.sh or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
+  if vim.fn.executable("mdp") == 0 then
+    err("mdp binary not found. Install via `curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh` or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
     return
   end
+  local mdp = "mdp"
+
+  local job_env = nil
+  if M.opts.colemak then job_env = { MDP_COLEMAK = "1" } end
 
   M.state.job_id = vim.fn.jobstart(
     { mdp, "serve", file, tostring(M.state.port), theme },
@@ -338,6 +367,7 @@ function M.open(theme)
       stdin = "pipe",
       stdout_buffered = false,
       stderr_buffered = false,
+      env = job_env,
       on_stdout = function(_, data)
         for _, line in ipairs(data) do
           if line ~= "" then log(line) end
