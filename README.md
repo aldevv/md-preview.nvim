@@ -78,12 +78,12 @@ require("md-preview").setup({ keymaps = false })
 
 ## CLI config
 
-The `mdp` binary reads `~/.config/md-preview/config.toml`. See the [md-preview README](https://github.com/aldevv/md-preview#config----configmd-previewconfigtoml) for the full reference. The plugin's `colemak = true` opt forces colemak mode via `MDP_COLEMAK=1` regardless of the config file.
+The `mdp` binary reads `~/.config/md-preview/config.toml`. See the [md-preview README](https://github.com/aldevv/md-preview#config) for the full reference. The plugin's `colemak = true` opt forces colemak mode via `MDP_COLEMAK=1` regardless of the config file.
 
 ## Requirements
 
 - **Neovim ≥ 0.9** (uses `vim.uv or vim.loop`, `vim.json.encode`, `vim.api.nvim_create_augroup{ clear = true }`, `vim.keymap.set`).
-- The `mdp` binary on `PATH` — fetched as a prebuilt binary by [`install.sh`](https://github.com/aldevv/md-preview/blob/main/install.sh) (no Go toolchain required). Run `:MdPreviewInstall` from inside Neovim, or wire it as the lazy.nvim `build` step shown above.
+- The `mdp` binary on `PATH` — installed by [`install.sh`](https://github.com/aldevv/md-preview/blob/main/install.sh), which uses `go install` if Go is available and otherwise downloads a prebuilt release binary. Run `:MdPreviewInstall` from inside Neovim, or wire it as the lazy.nvim `build` step shown above.
 - A Chromium-family browser for the chromeless `--app=` window. On Linux, `mdp` looks for `google-chrome` / `chromium` / `chromium-browser` and falls back to `xdg-open` if none are on `PATH`.
 - `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional). On a pure Wayland session where neither tool can see the window, you'll get a warning and need to close it manually.
 - **Native Windows is not supported.** WSL works (it's Linux from Neovim's perspective).
