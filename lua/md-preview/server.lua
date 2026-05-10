@@ -11,10 +11,8 @@ function M.is_alive()
   return vim.fn.jobwait({ store.state.job_id }, 0)[1] == -1
 end
 
--- Block until nothing is listening on `port`, or `timeout_ms` elapses.
--- Used between teardown and respawn: jobstop sends SIGTERM async, so the
--- previous mdp can still hold the port for a beat after M.close returns,
--- and a fresh jobstart races it and dies with "address in use".
+-- jobstop sends SIGTERM async, so the previous mdp can briefly outlive
+-- M.close and a fresh jobstart races it with "address in use".
 function M.wait_port_free(port, timeout_ms)
   return vim.wait(timeout_ms or 1000, function()
     local sock = uv.new_tcp()

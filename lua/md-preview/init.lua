@@ -70,10 +70,8 @@ function M.open(theme)
     return
   end
 
-  -- Always start fresh. Re-running <leader>mv after manually closing the
-  -- Chrome window used to send a render JSON to the still-running server
-  -- with no visible window; tearing down + respawning sidesteps that and
-  -- keeps the lifecycle simple (one server, one window, per <leader>mv).
+  -- Respawn rather than reuse: re-opening after the user manually closed
+  -- the Chrome window would otherwise render to an orphan server.
   if M.is_alive() then
     M.close()
     server.wait_port_free(M.opts.port)
@@ -109,11 +107,13 @@ function M.open(theme)
           if line ~= "" then notify.err(line) end
         end
       end,
-      on_exit = function(_, code)
+      on_exit = function(job, code)
         if code ~= 0 then
           notify.err("Server exited with code " .. code)
         end
-        M.state.job_id = nil
+        -- Old job's on_exit can fire after respawn has set a new job_id;
+        -- guard against clobbering the live server's id.
+        if M.state.job_id == job then M.state.job_id = nil end
       end,
     }
   )
