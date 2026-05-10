@@ -16,7 +16,7 @@ The renderer/server lives in a separate repo: [aldevv/md-preview](https://github
 }
 ```
 
-On `setup()`, the plugin checks for `mdp` on PATH. If it's missing and `go` is available, it runs `GOBIN=~/.local/bin go install github.com/aldevv/md-preview/cmd/mdp@latest` to put the binary in a stable place. Otherwise it points you at the standalone install one-liner:
+On `setup()`, the plugin checks for `mdp` on PATH. If it's missing and `curl` is available, it runs the standalone install script — which downloads a prebuilt binary into `~/.local/bin/mdp` (no Go toolchain required). You can also install manually:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh

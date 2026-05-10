@@ -13,6 +13,9 @@ local DEFAULT_KEYMAPS = {
   close      = "<leader>mq",
 }
 
+local INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh"
+local INSTALL_HINT = "mdp binary not found. Install via `curl -fsSL " .. INSTALL_SCRIPT_URL .. " | sh`."
+
 M.opts = {
   auto_position = true,   -- resize/reposition terminal + browser side-by-side
   keymaps       = true,   -- true = defaults | false = none | table = overrides
@@ -125,34 +128,22 @@ function M.setup(opts)
 end
 
 -- ── CLI install ──────────────────────────────────────────────────────────
--- The `mdp` binary lives in a separate repo (github.com/aldevv/md-preview).
--- If it's already on PATH, do nothing. Otherwise, when Go is available,
--- run `go install github.com/aldevv/md-preview/cmd/mdp@latest` with
--- GOBIN=~/.local/bin so the binary lands at a stable, known location.
--- When neither is available, leave a breadcrumb pointing at the install
--- script.
+-- Delegates to the canonical install.sh in aldevv/md-preview, which uses
+-- a prebuilt release binary (no Go toolchain needed). Only requirement
+-- is curl + sh, which any system we'd run on already has.
 function M.install_cli()
   if vim.fn.executable("mdp") == 1 then return end
 
-  local link_dir = vim.fn.expand("~/.local/bin")
-  if vim.fn.isdirectory(link_dir) == 0 then
-    vim.fn.mkdir(link_dir, "p")
-  end
-
-  if vim.fn.executable("go") == 1 then
-    info("Installing mdp via `go install`…")
-    local out = vim.fn.system({
-      "env", "GOBIN=" .. link_dir,
-      "go", "install", "github.com/aldevv/md-preview/cmd/mdp@latest",
-    })
-    if vim.v.shell_error ~= 0 then
-      err("go install failed: " .. (out or ""))
-      return
-    end
+  if vim.fn.executable("curl") ~= 1 or vim.fn.executable("sh") ~= 1 then
+    err(INSTALL_HINT)
     return
   end
 
-  err("mdp binary not found. Install via `curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh` or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
+  info("Installing mdp from github.com/aldevv/md-preview…")
+  local out = vim.fn.system({ "sh", "-c", "curl -fsSL " .. INSTALL_SCRIPT_URL .. " | sh" })
+  if vim.v.shell_error ~= 0 then
+    err("install failed: " .. (out or "") .. "\n" .. INSTALL_HINT)
+  end
 end
 
 -- ── Server health check ───────────────────────────────────────────────────
@@ -170,6 +161,8 @@ local function send(msg)
 end
 
 -- ── Poll until server is ready ────────────────────────────────────────────
+-- TCP probe rather than shelling out to curl every 50ms — same readiness
+-- signal (port accepts connections), no fork+exec on each retry.
 
 local function poll_ready(port, on_ready, retries)
   retries = retries or 0
@@ -177,14 +170,15 @@ local function poll_ready(port, on_ready, retries)
     err("Server did not start on port " .. port)
     return
   end
-  vim.defer_fn(function()
-    local ok = pcall(vim.fn.system, "curl -sf --max-time 0.1 http://localhost:" .. port .. "/reload")
-    if ok and vim.v.shell_error == 0 then
+  local sock = uv.new_tcp()
+  sock:connect("127.0.0.1", port, vim.schedule_wrap(function(connect_err)
+    sock:close()
+    if not connect_err then
       on_ready()
     else
-      poll_ready(port, on_ready, retries + 1)
+      vim.defer_fn(function() poll_ready(port, on_ready, retries + 1) end, 50)
     end
-  end, 50)
+  end))
 end
 
 -- ── Autocmds ─────────────────────────────────────────────────────────────
@@ -367,16 +361,15 @@ function M.open(theme)
   clear_stale_server(M.state.port)
 
   if vim.fn.executable("mdp") == 0 then
-    err("mdp binary not found. Install via `curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh` or `go install github.com/aldevv/md-preview/cmd/mdp@latest`.")
+    err(INSTALL_HINT)
     return
   end
-  local mdp = "mdp"
 
   local job_env = nil
   if M.opts.colemak then job_env = { MDP_COLEMAK = "1" } end
 
   M.state.job_id = vim.fn.jobstart(
-    { mdp, "serve", file, tostring(M.state.port), theme },
+    { "mdp", "serve", file, tostring(M.state.port), theme },
     {
       stdin = "pipe",
       stdout_buffered = false,

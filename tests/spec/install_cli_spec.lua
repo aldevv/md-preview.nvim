@@ -28,14 +28,14 @@ describe("install_cli", function()
   local calls
   local notifications
 
-  -- fail_when is a sentinel: tests set it to argv[1] (e.g. "env") to make
+  -- fail_when is a sentinel: tests set it to argv[1] (e.g. "sh") to make
   -- the next stubbed system() call resolve via a real failing shell command,
   -- which sets vim.v.shell_error without writing to it.
   local fail_when
 
   before_each(function()
     saved = snapshot_fn()
-    calls = { system = {} }
+    calls = {}
     notifications = {}
     fail_when = nil
 
@@ -43,7 +43,7 @@ describe("install_cli", function()
     vim.fn.mkdir = function() end
     vim.fn.expand = function(s) return (s:gsub("^~", "/HOME")) end
     vim.fn.system = function(argv)
-      table.insert(calls.system, argv)
+      table.insert(calls, argv)
       if type(argv) == "table" and fail_when == argv[1] then
         return saved.system("false")
       end
@@ -58,9 +58,10 @@ describe("install_cli", function()
     restore_fn(saved)
   end)
 
-  local function had_call(cmd)
-    for _, argv in ipairs(calls.system) do
-      if type(argv) == "table" and argv[1] == cmd then
+  local function had_shell_call_matching(substr)
+    for _, argv in ipairs(calls) do
+      if type(argv) == "table" and argv[1] == "sh"
+         and type(argv[3]) == "string" and argv[3]:find(substr, 1, true) then
         return true, argv
       end
     end
@@ -76,12 +77,16 @@ describe("install_cli", function()
     return false
   end
 
-  it("warns when mdp and go are both absent", function()
-    vim.fn.executable = function() return 0 end
+  it("warns when curl is absent", function()
+    vim.fn.executable = function(p)
+      if p == "sh" then return 1 end
+      return 0
+    end
     fresh_plugin().install_cli()
     assert(notified_with("mdp binary not found"),
       "expected 'mdp binary not found' notification")
-    assert(not had_call("env"), "go install should not be invoked")
+    assert(not had_shell_call_matching("install.sh"),
+      "install.sh should not be invoked when curl is missing")
   end)
 
   it("stays silent when mdp is already on PATH", function()
@@ -92,35 +97,27 @@ describe("install_cli", function()
     fresh_plugin().install_cli()
     assert(not notified_with("mdp binary not found"),
       "should not warn when mdp is on PATH")
-    assert(not had_call("env"), "go install should not be invoked when mdp on PATH")
+    assert(#calls == 0, "no shell-out should happen when mdp is on PATH")
   end)
 
-  it("runs `go install` with GOBIN when mdp missing and go available", function()
+  it("runs install.sh via curl|sh when mdp missing and curl available", function()
     vim.fn.executable = function(p)
-      if p == "go" then return 1 end
+      if p == "curl" or p == "sh" then return 1 end
       return 0
     end
     fresh_plugin().install_cli()
-    local ok, argv = had_call("env")
-    assert(ok, "env GOBIN=... go install should be invoked")
-    -- Expected shape:
-    --   { "env", "GOBIN=/HOME/.local/bin", "go", "install",
-    --     "github.com/aldevv/md-preview/cmd/mdp@latest" }
-    assert(argv[2] and argv[2]:match("^GOBIN="),
-      "second arg should set GOBIN; got " .. tostring(argv[2]))
-    assert(argv[3] == "go",  "third arg should be 'go'")
-    assert(argv[4] == "install", "fourth arg should be 'install'")
-    assert(argv[5] == "github.com/aldevv/md-preview/cmd/mdp@latest",
-      "fifth arg should be the module path; got " .. tostring(argv[5]))
+    local ok, argv = had_shell_call_matching("aldevv/md-preview/main/install.sh")
+    assert(ok, "expected `sh -c 'curl … install.sh | sh'` invocation, got " .. vim.inspect(calls))
+    assert(argv[2] == "-c", "second arg should be -c; got " .. tostring(argv[2]))
   end)
 
-  it("surfaces go install failures via err()", function()
+  it("surfaces install failures via err()", function()
     vim.fn.executable = function(p)
-      if p == "go" then return 1 end
+      if p == "curl" or p == "sh" then return 1 end
       return 0
     end
-    fail_when = "env"
+    fail_when = "sh"
     fresh_plugin().install_cli()
-    assert(notified_with("go install failed"), "expected go install failure notification")
+    assert(notified_with("install failed"), "expected install failure notification")
   end)
 end)
