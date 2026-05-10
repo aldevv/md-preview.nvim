@@ -20,7 +20,10 @@ describe("M.close teardown", function()
     vim.fn.chansend = function() end
     vim.fn.jobstart = function() return 99 end
     vim.fn.executable = function() return 0 end
-    vim.fn.system = function() vim.v.shell_error = 0; return "" end
+    vim.fn.system = function()
+      vim.v.shell_error = 0
+      return ""
+    end
     vim.notify = function() end
     vim.api.nvim_del_augroup_by_id = function() end
 
@@ -87,13 +90,13 @@ describe("autocmds.register", function()
     package.loaded["md-preview.autocmds"] = nil
     package.loaded["md-preview.state"] = nil
     local autocmds = require("md-preview.autocmds")
-    local store    = require("md-preview.state")
+    local store = require("md-preview.state")
 
     -- Stub plugin callbacks; we only need the autocmds wired, not fired.
     local plugin = {
-      on_save         = function() end,
+      on_save = function() end,
       on_cursor_moved = function() end,
-      close           = function() end,
+      close = function() end,
     }
 
     autocmds.register(plugin)
@@ -101,11 +104,13 @@ describe("autocmds.register", function()
     assert.is_truthy(store.state.augroup, "augroup id should be set")
     local entries = vim.api.nvim_get_autocmds({ group = store.state.augroup })
     local events = {}
-    for _, e in ipairs(entries) do events[e.event] = true end
+    for _, e in ipairs(entries) do
+      events[e.event] = true
+    end
     assert.is_true(events.BufWritePost, "BufWritePost autocmd missing")
-    assert.is_true(events.CursorMoved,  "CursorMoved autocmd missing")
-    assert.is_true(events.BufWipeout,   "BufWipeout autocmd missing")
-    assert.is_true(events.VimLeavePre,  "VimLeavePre autocmd missing")
+    assert.is_true(events.CursorMoved, "CursorMoved autocmd missing")
+    assert.is_true(events.BufWipeout, "BufWipeout autocmd missing")
+    assert.is_true(events.VimLeavePre, "VimLeavePre autocmd missing")
 
     pcall(vim.api.nvim_del_augroup_by_id, store.state.augroup)
     store.state.augroup = nil
@@ -113,11 +118,11 @@ describe("autocmds.register", function()
 
   it("re-registering deletes the previous augroup", function()
     local autocmds = require("md-preview.autocmds")
-    local store    = require("md-preview.state")
+    local store = require("md-preview.state")
     local plugin = {
-      on_save         = function() end,
+      on_save = function() end,
       on_cursor_moved = function() end,
-      close           = function() end,
+      close = function() end,
     }
 
     autocmds.register(plugin)

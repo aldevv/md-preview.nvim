@@ -4,8 +4,12 @@ local plenary = cache .. "/plenary.nvim"
 if vim.fn.isdirectory(plenary) == 0 then
   vim.fn.mkdir(cache, "p")
   vim.fn.system({
-    "git", "clone", "--depth", "1",
-    "https://github.com/nvim-lua/plenary.nvim.git", plenary,
+    "git",
+    "clone",
+    "--depth",
+    "1",
+    "https://github.com/nvim-lua/plenary.nvim.git",
+    plenary,
   })
 end
 

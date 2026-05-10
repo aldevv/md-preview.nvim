@@ -8,9 +8,7 @@ end
 local function spy_keymap_set()
   local saved = vim.keymap.set
   local calls = {}
-  vim.keymap.set = function(mode, lhs, rhs, opts)
-    table.insert(calls, { mode = mode, lhs = lhs, rhs = rhs, opts = opts })
-  end
+  vim.keymap.set = function(mode, lhs, rhs, opts) table.insert(calls, { mode = mode, lhs = lhs, rhs = rhs, opts = opts }) end
   return function() vim.keymap.set = saved end, calls
 end
 
@@ -40,7 +38,9 @@ describe("setup() leader keymaps", function()
 
     assert.are.equal(3, #calls)
     local lhs = {}
-    for _, c in ipairs(calls) do lhs[c.lhs] = true end
+    for _, c in ipairs(calls) do
+      lhs[c.lhs] = true
+    end
     assert.is_true(lhs["<leader>mv"])
     assert.is_true(lhs["<leader>mV"])
     assert.is_true(lhs["<leader>mq"])
@@ -69,7 +69,9 @@ describe("setup() leader keymaps", function()
     restore_silence()
 
     local lhs = {}
-    for _, c in ipairs(calls) do lhs[c.lhs] = true end
+    for _, c in ipairs(calls) do
+      lhs[c.lhs] = true
+    end
     assert.is_true(lhs["<leader>op"], "custom open_dark should be registered")
     assert.is_true(lhs["<leader>mV"], "default open_light should remain")
     assert.is_true(lhs["<leader>mq"], "default close should remain")
@@ -87,7 +89,9 @@ describe("setup() leader keymaps", function()
     restore_silence()
 
     local lhs = {}
-    for _, c in ipairs(calls) do lhs[c.lhs] = true end
+    for _, c in ipairs(calls) do
+      lhs[c.lhs] = true
+    end
     assert.is_true(lhs["<leader>mv"])
     assert.is_true(lhs["<leader>mV"])
     assert.is_nil(lhs["<leader>mq"], "close should be skipped")

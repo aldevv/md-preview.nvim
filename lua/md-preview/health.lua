@@ -4,10 +4,10 @@
 
 local h = vim.health
 local hstart = h.start or h.report_start
-local hok    = h.ok    or h.report_ok
-local hwarn  = h.warn  or h.report_warn
-local herr   = h.error or h.report_error
-local hinfo  = h.info  or h.report_info
+local hok = h.ok or h.report_ok
+local hwarn = h.warn or h.report_warn
+local herr = h.error or h.report_error
+local hinfo = h.info or h.report_info
 
 local M = {}
 
@@ -37,7 +37,7 @@ function M.check()
   end
 
   check_dep("curl", { "Required by :MdPreviewInstall." })
-  check_dep("sh",   { "Required by :MdPreviewInstall." })
+  check_dep("sh", { "Required by :MdPreviewInstall." })
 
   local platform = require("md-preview.platform")
   local chrome = platform.find_chrome()
@@ -83,8 +83,9 @@ function M.check()
     end
   elseif uname.sysname == "Darwin" then
     local opts = require("md-preview.state").opts
-    hinfo("AppleScript will tile process `" .. (opts.terminal_app or "kitty")
-      .. "` beside Chrome (configurable via the `terminal_app` opt)")
+    hinfo(
+      "AppleScript will tile process `" .. (opts.terminal_app or "kitty") .. "` beside Chrome (configurable via the `terminal_app` opt)"
+    )
   else
     hwarn("Platform `" .. uname.sysname .. "` is not officially supported", {
       "macOS and Linux are tested. Native Windows is not supported (WSL works).",

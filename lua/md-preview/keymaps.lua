@@ -6,9 +6,9 @@ local notify = require("md-preview.notify")
 local M = {}
 
 M.DEFAULTS = {
-  open_dark  = "<leader>mv",
+  open_dark = "<leader>mv",
   open_light = "<leader>mV",
-  close      = "<leader>mq",
+  close = "<leader>mq",
 }
 
 function M.resolve(km)
@@ -26,9 +26,9 @@ function M.register(km, plugin)
     if not lhs then return end
     vim.keymap.set("n", lhs, rhs, { silent = true, desc = desc })
   end
-  map(km.open_dark,  function() plugin.open("dark")  end, "md-preview: open (dark)")
+  map(km.open_dark, function() plugin.open("dark") end, "md-preview: open (dark)")
   map(km.open_light, function() plugin.open("light") end, "md-preview: open (light)")
-  map(km.close,      function() plugin.close()       end, "md-preview: close")
+  map(km.close, function() plugin.close() end, "md-preview: close")
 end
 
 return M

@@ -49,8 +49,10 @@ describe("M.open argument validation", function()
 
     vim.fn.expand = saved_expand
     vim.notify = saved_notify
-    assert(notified and notified:find("Not a markdown file", 1, true),
-      "expected 'Not a markdown file' notification, got: " .. tostring(notified))
+    assert(
+      notified and notified:find("Not a markdown file", 1, true),
+      "expected 'Not a markdown file' notification, got: " .. tostring(notified)
+    )
   end)
 
   it("errors out when no mdp binary is reachable", function()
@@ -70,8 +72,14 @@ describe("M.open argument validation", function()
       return saved_expand(s)
     end
     vim.fn.executable = function() return 0 end
-    vim.fn.system = function() vim.v.shell_error = 0; return "" end
-    vim.fn.jobstart = function() jobstart_called = true; return 1 end
+    vim.fn.system = function()
+      vim.v.shell_error = 0
+      return ""
+    end
+    vim.fn.jobstart = function()
+      jobstart_called = true
+      return 1
+    end
     vim.notify = function(msg) table.insert(notifications, msg) end
 
     m.state.job_id = nil
@@ -87,11 +95,8 @@ describe("M.open argument validation", function()
     assert(not jobstart_called, "jobstart should not run when mdp is missing")
     local saw_err = false
     for _, n in ipairs(notifications) do
-      if type(n) == "string" and n:find("mdp binary not found", 1, true) then
-        saw_err = true
-      end
+      if type(n) == "string" and n:find("mdp binary not found", 1, true) then saw_err = true end
     end
-    assert(saw_err, "expected 'mdp binary not found' notification, got: " ..
-      vim.inspect(notifications))
+    assert(saw_err, "expected 'mdp binary not found' notification, got: " .. vim.inspect(notifications))
   end)
 end)

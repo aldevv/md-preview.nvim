@@ -1,7 +1,7 @@
-local notify   = require("md-preview.notify")
+local notify = require("md-preview.notify")
 local platform = require("md-preview.platform")
-local server   = require("md-preview.server")
-local store    = require("md-preview.state")
+local server = require("md-preview.server")
+local store = require("md-preview.state")
 
 local uv = platform.uv
 local M = {}
@@ -40,18 +40,22 @@ function M.debounce_scroll(get_row)
   close_handle(current_timer)
   local timer = uv.new_timer()
   current_timer = timer
-  timer:start(50, 0, vim.schedule_wrap(function()
-    -- A fresher CursorMoved may have replaced us; the cancellation path
-    -- already closed our handle.
-    if current_timer ~= timer then return end
-    current_timer = nil
-    close_handle(timer)
-    if not server.is_alive() then return end
-    local row = get_row()
-    if row == last_scroll_line then return end
-    last_scroll_line = row
-    M.send({ type = "scroll", line = row })
-  end))
+  timer:start(
+    50,
+    0,
+    vim.schedule_wrap(function()
+      -- A fresher CursorMoved may have replaced us; the cancellation path
+      -- already closed our handle.
+      if current_timer ~= timer then return end
+      current_timer = nil
+      close_handle(timer)
+      if not server.is_alive() then return end
+      local row = get_row()
+      if row == last_scroll_line then return end
+      last_scroll_line = row
+      M.send({ type = "scroll", line = row })
+    end)
+  )
 end
 
 -- TCP probe rather than shelling out to curl every 50ms — same readiness
@@ -63,15 +67,19 @@ function M.poll_ready(port, on_ready, retries)
     return
   end
   local sock = uv.new_tcp()
-  sock:connect("127.0.0.1", port, vim.schedule_wrap(function(connect_err)
-    -- The connect callback can fire after a stale retry already closed us.
-    close_handle(sock)
-    if not connect_err then
-      on_ready()
-    else
-      vim.defer_fn(function() M.poll_ready(port, on_ready, retries + 1) end, 50)
-    end
-  end))
+  sock:connect(
+    "127.0.0.1",
+    port,
+    vim.schedule_wrap(function(connect_err)
+      -- The connect callback can fire after a stale retry already closed us.
+      close_handle(sock)
+      if not connect_err then
+        on_ready()
+      else
+        vim.defer_fn(function() M.poll_ready(port, on_ready, retries + 1) end, 50)
+      end
+    end)
+  )
 end
 
 return M

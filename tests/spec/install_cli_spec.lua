@@ -35,20 +35,15 @@ describe("install_cli", function()
       table.insert(jobstart_calls, { argv = argv, opts = opts })
       return 1
     end
-    vim.notify = function(msg, level)
-      table.insert(notifications, { msg = msg, level = level })
-    end
+    vim.notify = function(msg, level) table.insert(notifications, { msg = msg, level = level }) end
   end)
 
-  after_each(function()
-    restore_fn(saved)
-  end)
+  after_each(function() restore_fn(saved) end)
 
   local function had_jobstart_matching(substr)
     for _, call in ipairs(jobstart_calls) do
       local argv = call.argv
-      if type(argv) == "table" and argv[1] == "sh"
-         and type(argv[3]) == "string" and argv[3]:find(substr, 1, true) then
+      if type(argv) == "table" and argv[1] == "sh" and type(argv[3]) == "string" and argv[3]:find(substr, 1, true) then
         return true, call
       end
     end
@@ -57,9 +52,7 @@ describe("install_cli", function()
 
   local function notified_with(substr)
     for _, n in ipairs(notifications) do
-      if type(n.msg) == "string" and n.msg:find(substr, 1, true) then
-        return true
-      end
+      if type(n.msg) == "string" and n.msg:find(substr, 1, true) then return true end
     end
     return false
   end
@@ -70,10 +63,8 @@ describe("install_cli", function()
       return 0
     end
     fresh_plugin().install_cli()
-    assert(notified_with("mdp binary not found"),
-      "expected 'mdp binary not found' notification")
-    assert(#jobstart_calls == 0,
-      "jobstart should not be invoked when curl is missing")
+    assert(notified_with("mdp binary not found"), "expected 'mdp binary not found' notification")
+    assert(#jobstart_calls == 0, "jobstart should not be invoked when curl is missing")
   end)
 
   it("stays silent when mdp is already on PATH", function()
@@ -82,8 +73,7 @@ describe("install_cli", function()
       return 0
     end
     fresh_plugin().install_cli()
-    assert(not notified_with("mdp binary not found"),
-      "should not warn when mdp is on PATH")
+    assert(not notified_with("mdp binary not found"), "should not warn when mdp is on PATH")
     assert(#jobstart_calls == 0, "no jobstart should happen when mdp is on PATH")
   end)
 
@@ -109,8 +99,7 @@ describe("install_cli", function()
     fresh_plugin().install_cli()
     local _, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
     call.opts.on_exit(0, 0)
-    assert(notified_with("mdp installed"),
-      "expected success notification after on_exit(0)")
+    assert(notified_with("mdp installed"), "expected success notification after on_exit(0)")
   end)
 
   it("surfaces install failures via err() in on_exit", function()
@@ -122,10 +111,8 @@ describe("install_cli", function()
     local _, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
     call.opts.on_stderr(0, { "curl: (6) Could not resolve host" })
     call.opts.on_exit(0, 7)
-    assert(notified_with("install failed"),
-      "expected install failure notification")
-    assert(notified_with("Could not resolve host"),
-      "expected stderr to be surfaced in failure notification")
+    assert(notified_with("install failed"), "expected install failure notification")
+    assert(notified_with("Could not resolve host"), "expected stderr to be surfaced in failure notification")
   end)
 
   it("surfaces jobstart scheduling failure (return <= 0)", function()
@@ -138,7 +125,6 @@ describe("install_cli", function()
       return -1
     end
     fresh_plugin().install_cli()
-    assert(notified_with("install failed: jobstart returned -1"),
-      "expected jobstart failure notification")
+    assert(notified_with("install failed: jobstart returned -1"), "expected jobstart failure notification")
   end)
 end)

@@ -1,0 +1,12 @@
+column_width = 140
+line_endings = "Unix"
+indent_type = "Spaces"
+indent_width = 2
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"
+# "Always" keeps both styles the codebase actually uses on one line:
+#   • dispatcher functions  → function M.log(msg) emit(...) end
+#   • single-statement ifs  → if f == store.state.file then plugin.close() end
+# Stylua still strips manual alignment whitespace inside tables — for those
+# blocks we use `-- stylua: ignore` markers in source.
+collapse_simple_statement = "Always"

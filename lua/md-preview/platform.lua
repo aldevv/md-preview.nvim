@@ -1,18 +1,23 @@
 local M = {}
 
-M.uv = vim.uv or vim.loop  -- vim.uv on 0.10+, vim.loop on older builds
+M.uv = vim.uv or vim.loop -- vim.uv on 0.10+, vim.loop on older builds
 
 -- WMs that already tile windows on launch — the launcher just spawns the
 -- browser; the WM places it.
 M.AUTO_TILING_WMS = {
-  xmonad = true, dwm = true, i3 = true, sway = true, bspwm = true,
-  awesome = true, hyprland = true, river = true, qtile = true,
+  xmonad = true,
+  dwm = true,
+  i3 = true,
+  sway = true,
+  bspwm = true,
+  awesome = true,
+  hyprland = true,
+  river = true,
+  qtile = true,
 }
 
 function M.detect_wm()
-  local env = os.getenv("XDG_CURRENT_DESKTOP")
-      or os.getenv("DESKTOP_SESSION")
-      or os.getenv("XDG_SESSION_DESKTOP")
+  local env = os.getenv("XDG_CURRENT_DESKTOP") or os.getenv("DESKTOP_SESSION") or os.getenv("XDG_SESSION_DESKTOP")
   if env and env ~= "" then
     local first = env:lower():match("[%w_-]+")
     if first then return first end

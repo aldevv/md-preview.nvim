@@ -3,9 +3,7 @@ local store = require("md-preview.state")
 local M = {}
 
 function M.register(plugin)
-  if store.state.augroup then
-    pcall(vim.api.nvim_del_augroup_by_id, store.state.augroup)
-  end
+  if store.state.augroup then pcall(vim.api.nvim_del_augroup_by_id, store.state.augroup) end
   local aug = vim.api.nvim_create_augroup("MdPreview", { clear = true })
   store.state.augroup = aug
 

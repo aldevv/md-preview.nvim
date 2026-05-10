@@ -1,6 +1,6 @@
-local notify   = require("md-preview.notify")
+local notify = require("md-preview.notify")
 local platform = require("md-preview.platform")
-local store    = require("md-preview.state")
+local store = require("md-preview.state")
 
 local uv = platform.uv
 
@@ -36,8 +36,7 @@ function M.clear_stale(port)
   local pids_str = vim.fn.system("lsof -ti :" .. port .. " 2>/dev/null")
   local killed = {}
   for pid in pids_str:gmatch("%d+") do
-    local basename = vim.fn.system("ps -o comm= -p " .. pid .. " 2>/dev/null")
-      :gsub("%s+$", "")
+    local basename = vim.fn.system("ps -o comm= -p " .. pid .. " 2>/dev/null"):gsub("%s+$", "")
     if basename == "mdp" then
       vim.fn.system("kill " .. pid)
       table.insert(killed, pid)

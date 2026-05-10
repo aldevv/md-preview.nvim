@@ -1,19 +1,16 @@
-local notify   = require("md-preview.notify")
+local notify = require("md-preview.notify")
 local platform = require("md-preview.platform")
-local store    = require("md-preview.state")
+local store = require("md-preview.state")
 
 local M = {}
 
 function M.open()
-  local s   = store.state
+  local s = store.state
   local url = "http://localhost:" .. store.opts.port .. "/"
 
   if s.platform == "macos" then
     if not store.opts.auto_position then
-      vim.fn.jobstart(
-        { "open", "-na", "Google Chrome", "--args", "--app=" .. url },
-        { detach = true }
-      )
+      vim.fn.jobstart({ "open", "-na", "Google Chrome", "--args", "--app=" .. url }, { detach = true })
       return
     end
     -- Tile `terminal_app` to the left 60% and Chrome to the right 40%. The
@@ -21,7 +18,8 @@ function M.open()
     -- terminal (alacritty, wezterm, iTerm2, Terminal, Ghostty) just skip
     -- the resize step rather than seeing an AppleScript error dialog.
     local term = (store.opts.terminal_app or "kitty"):gsub('"', '\\"')
-    local script = string.format([[
+    local script = string.format(
+      [[
 tell application "Finder"
   set db to bounds of window of desktop
 end tell
@@ -60,7 +58,10 @@ tell application "System Events"
     set size     of window 1 to {chromeW, screenH}
   end tell
 end tell
-]], term, url)
+]],
+      term,
+      url
+    )
     vim.fn.jobstart({ "osascript", "-e", script }, { detach = true })
     return
   end
@@ -86,7 +87,10 @@ function M.close_window()
   if s.platform == "macos" then
     local port = store.opts.port
     vim.fn.jobstart({
-      "osascript", "-e", string.format([[
+      "osascript",
+      "-e",
+      string.format(
+        [[
 tell application "System Events"
   tell process "Google Chrome"
     set wins to windows
@@ -99,7 +103,9 @@ tell application "System Events"
     end repeat
   end tell
 end tell
-]], port),
+]],
+        port
+      ),
     }, { detach = true })
   elseif s.platform == "linux" then
     -- Chromium with --app= shares the master process via IPC, so jobstop
@@ -107,8 +113,7 @@ end tell
     -- ask the WM to close it.
     local title = "localhost:" .. store.opts.port
     if vim.fn.executable("xdotool") == 1 then
-      vim.fn.system("xdotool search --name " .. vim.fn.shellescape(title)
-        .. " windowclose 2>/dev/null")
+      vim.fn.system("xdotool search --name " .. vim.fn.shellescape(title) .. " windowclose 2>/dev/null")
     elseif vim.fn.executable("wmctrl") == 1 then
       vim.fn.system("wmctrl -c " .. vim.fn.shellescape(title) .. " 2>/dev/null")
     end
@@ -116,10 +121,8 @@ end tell
     -- window was launched as native Wayland, neither tool can see it.
     -- Warn rather than silently leaving the window orphaned.
     local wayland = os.getenv("WAYLAND_DISPLAY")
-    if wayland and wayland ~= "" and vim.fn.executable("xdotool") ~= 1
-        and vim.fn.executable("wmctrl") ~= 1 then
-      notify.warn("xdotool/wmctrl not available on this Wayland session — "
-        .. "close the preview window manually")
+    if wayland and wayland ~= "" and vim.fn.executable("xdotool") ~= 1 and vim.fn.executable("wmctrl") ~= 1 then
+      notify.warn("xdotool/wmctrl not available on this Wayland session — " .. "close the preview window manually")
     end
   end
 end

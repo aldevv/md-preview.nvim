@@ -20,27 +20,22 @@ function M.run()
 
   notify.info("Installing mdp from github.com/aldevv/md-preview…")
   local stderr_lines = {}
-  local job = vim.fn.jobstart(
-    { "sh", "-c", "curl -fsSL " .. M.SCRIPT_URL .. " | sh" },
-    {
-      stderr_buffered = true,
-      on_stderr = function(_, data)
-        for _, line in ipairs(data or {}) do
-          if line ~= "" then table.insert(stderr_lines, line) end
-        end
-      end,
-      on_exit = function(_, code)
-        if code == 0 then
-          notify.info("mdp installed")
-        else
-          notify.err("install failed: " .. table.concat(stderr_lines, "\n") .. "\n" .. M.HINT)
-        end
-      end,
-    }
-  )
-  if job <= 0 then
-    notify.err("install failed: jobstart returned " .. tostring(job) .. "\n" .. M.HINT)
-  end
+  local job = vim.fn.jobstart({ "sh", "-c", "curl -fsSL " .. M.SCRIPT_URL .. " | sh" }, {
+    stderr_buffered = true,
+    on_stderr = function(_, data)
+      for _, line in ipairs(data or {}) do
+        if line ~= "" then table.insert(stderr_lines, line) end
+      end
+    end,
+    on_exit = function(_, code)
+      if code == 0 then
+        notify.info("mdp installed")
+      else
+        notify.err("install failed: " .. table.concat(stderr_lines, "\n") .. "\n" .. M.HINT)
+      end
+    end,
+  })
+  if job <= 0 then notify.err("install failed: jobstart returned " .. tostring(job) .. "\n" .. M.HINT) end
 end
 
 return M
