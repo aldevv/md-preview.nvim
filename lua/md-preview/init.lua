@@ -70,11 +70,13 @@ function M.open(theme)
     return
   end
 
+  -- Always start fresh. Re-running <leader>mv after manually closing the
+  -- Chrome window used to send a render JSON to the still-running server
+  -- with no visible window; tearing down + respawning sidesteps that and
+  -- keeps the lifecycle simple (one server, one window, per <leader>mv).
   if M.is_alive() then
-    M.state.file = file
-    ipc.send({ type = "render", file = file })
-    notify.log("Switched preview to " .. vim.fn.fnamemodify(file, ":t"))
-    return
+    M.close()
+    server.wait_port_free(M.opts.port)
   end
 
   M.state.file = file

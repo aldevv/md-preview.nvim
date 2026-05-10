@@ -1,11 +1,32 @@
-local notify = require("md-preview.notify")
-local store  = require("md-preview.state")
+local notify   = require("md-preview.notify")
+local platform = require("md-preview.platform")
+local store    = require("md-preview.state")
+
+local uv = platform.uv
 
 local M = {}
 
 function M.is_alive()
   if store.state.job_id == nil then return false end
   return vim.fn.jobwait({ store.state.job_id }, 0)[1] == -1
+end
+
+-- Block until nothing is listening on `port`, or `timeout_ms` elapses.
+-- Used between teardown and respawn: jobstop sends SIGTERM async, so the
+-- previous mdp can still hold the port for a beat after M.close returns,
+-- and a fresh jobstart races it and dies with "address in use".
+function M.wait_port_free(port, timeout_ms)
+  return vim.wait(timeout_ms or 1000, function()
+    local sock = uv.new_tcp()
+    local refused, done = false, false
+    sock:connect("127.0.0.1", port, function(err)
+      refused = err ~= nil
+      done = true
+    end)
+    vim.wait(50, function() return done end, 5)
+    pcall(function() sock:close() end)
+    return refused
+  end, 25)
 end
 
 -- Scoped to processes whose executable basename is exactly `mdp` so we
