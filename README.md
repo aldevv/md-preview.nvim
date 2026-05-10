@@ -10,13 +10,14 @@ The renderer/server lives in a separate repo: [aldevv/md-preview](https://github
 {
   "aldevv/md-preview.nvim",
   ft = { "markdown" },
+  build = "curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh",
   config = function()
     require("md-preview").setup()
   end,
 }
 ```
 
-On `setup()`, the plugin checks for `mdp` on PATH. If it's missing and `curl` is available, it runs the standalone install script — which downloads a prebuilt binary into `~/.local/bin/mdp` (no Go toolchain required). You can also install manually:
+`build` runs once at install/update time and drops the prebuilt `mdp` binary into `$HOME/.local/bin` (override with `PREFIX=...`). If you skip `build`, `setup()` will warn that `mdp` isn't on `PATH` and prompt you to run `:MdPreviewInstall`, which invokes the same script. You can also install manually:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh

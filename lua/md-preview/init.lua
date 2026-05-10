@@ -124,13 +124,30 @@ function M.setup(opts)
   local km = resolve_keymaps(M.opts.keymaps)
   if km then register_keymaps(km) end
 
-  M.install_cli()
+  vim.api.nvim_create_user_command("MdPreviewInstall", function()
+    M.install_cli()
+  end, { desc = "Install the mdp CLI binary", force = true })
+
+  -- Passive check on startup — don't auto-install. The plugin spec's
+  -- `build = ...` step is the right place for one-shot install work; here
+  -- we just nudge the user if the binary isn't on PATH yet.
+  if vim.fn.executable("mdp") == 0 then
+    vim.notify(
+      "[md-preview] mdp not found. Run :MdPreviewInstall, or add `build = \"curl -fsSL "
+        .. INSTALL_SCRIPT_URL .. " | sh\"` to your plugin spec.",
+      vim.log.levels.WARN
+    )
+  end
 end
 
 -- ── CLI install ──────────────────────────────────────────────────────────
 -- Delegates to the canonical install.sh in aldevv/md-preview, which uses
 -- a prebuilt release binary (no Go toolchain needed). Only requirement
 -- is curl + sh, which any system we'd run on already has.
+--
+-- Invoked via :MdPreviewInstall, or directly from a plugin spec's build
+-- step (e.g. `build = ":MdPreviewInstall"` in lazy.nvim). NOT called from
+-- setup() — startup is not the right place for a one-shot install.
 function M.install_cli()
   if vim.fn.executable("mdp") == 1 then return end
 

@@ -14,23 +14,29 @@ local function spy_keymap_set()
   return function() vim.keymap.set = saved end, calls
 end
 
--- stub_install_cli prevents setup() from touching the filesystem / go.
-local function stub_install_cli(m)
-  local saved = m.install_cli
-  m.install_cli = function() end
-  return function() m.install_cli = saved end
+-- silence_setup mutes setup()'s "mdp not found" WARN and the user_command
+-- registration (which otherwise prints in test output). Returns a restore.
+local function silence_setup()
+  local saved_notify = vim.notify
+  local saved_cmd = vim.api.nvim_create_user_command
+  vim.notify = function() end
+  vim.api.nvim_create_user_command = function() end
+  return function()
+    vim.notify = saved_notify
+    vim.api.nvim_create_user_command = saved_cmd
+  end
 end
 
 describe("setup() leader keymaps", function()
   it("registers the three default mappings when keymaps is unset", function()
     local m = fresh_plugin()
-    local restore_install = stub_install_cli(m)
+    local restore_silence = silence_setup()
     local restore_spy, calls = spy_keymap_set()
 
     m.setup()
 
     restore_spy()
-    restore_install()
+    restore_silence()
 
     assert.are.equal(3, #calls)
     local lhs = {}
@@ -42,25 +48,25 @@ describe("setup() leader keymaps", function()
 
   it("registers no keymaps when keymaps = false", function()
     local m = fresh_plugin()
-    local restore_install = stub_install_cli(m)
+    local restore_silence = silence_setup()
     local restore_spy, calls = spy_keymap_set()
 
     m.setup({ keymaps = false })
 
     restore_spy()
-    restore_install()
+    restore_silence()
     assert.are.equal(0, #calls)
   end)
 
   it("merges a partial table with defaults", function()
     local m = fresh_plugin()
-    local restore_install = stub_install_cli(m)
+    local restore_silence = silence_setup()
     local restore_spy, calls = spy_keymap_set()
 
     m.setup({ keymaps = { open_dark = "<leader>op" } })
 
     restore_spy()
-    restore_install()
+    restore_silence()
 
     local lhs = {}
     for _, c in ipairs(calls) do lhs[c.lhs] = true end
@@ -72,13 +78,13 @@ describe("setup() leader keymaps", function()
 
   it("skips a single binding when its value is false", function()
     local m = fresh_plugin()
-    local restore_install = stub_install_cli(m)
+    local restore_silence = silence_setup()
     local restore_spy, calls = spy_keymap_set()
 
     m.setup({ keymaps = { close = false } })
 
     restore_spy()
-    restore_install()
+    restore_silence()
 
     local lhs = {}
     for _, c in ipairs(calls) do lhs[c.lhs] = true end
