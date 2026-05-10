@@ -51,6 +51,20 @@ end
 -- ── Compat: vim.uv (0.10+) or vim.loop ───────────────────────────────────
 local uv = vim.uv or vim.loop
 
+-- close_timer is the only safe way to drop a uv timer. Both the debounce
+-- cancellation path and the scheduled callback can race to close the same
+-- handle: a timer fires, libuv queues its vim.schedule_wrap'd cb, and
+-- before that cb runs another CursorMoved enters the cancellation path
+-- and closes the handle. When the queued cb finally runs, calling
+-- :close() again throws "handle is already closing". is_closing() makes
+-- the close idempotent.
+local function close_timer(t)
+  if t and not t:is_closing() then
+    t:stop()
+    t:close()
+  end
+end
+
 -- ── Platform detection ────────────────────────────────────────────────────
 
 local function detect_wm()
@@ -407,19 +421,17 @@ end
 function M.on_cursor_moved()
   if not M.is_alive() then return end
 
-  -- Cancel existing timer
-  if M.state.debounce_timer then
-    M.state.debounce_timer:stop()
-    M.state.debounce_timer:close()
-    M.state.debounce_timer = nil
-  end
+  close_timer(M.state.debounce_timer)
+  M.state.debounce_timer = nil
 
   local timer = uv.new_timer()
   M.state.debounce_timer = timer
   timer:start(50, 0, vim.schedule_wrap(function()
-    timer:stop()
-    timer:close()
+    -- A fresher CursorMoved may have already replaced us. If so, the
+    -- cancellation path closed our handle; bail without re-firing.
+    if M.state.debounce_timer ~= timer then return end
     M.state.debounce_timer = nil
+    close_timer(timer)
     if not M.is_alive() then return end
     -- cursor row is 1-indexed — matches data-line values in browser
     local row = vim.api.nvim_win_get_cursor(0)[1]
@@ -439,13 +451,8 @@ end
 -- ── Close ─────────────────────────────────────────────────────────────────
 
 function M.close()
-  if M.state.debounce_timer then
-    pcall(function()
-      M.state.debounce_timer:stop()
-      M.state.debounce_timer:close()
-    end)
-    M.state.debounce_timer = nil
-  end
+  close_timer(M.state.debounce_timer)
+  M.state.debounce_timer = nil
 
   if M.is_alive() then
     send({ type = "quit" })
