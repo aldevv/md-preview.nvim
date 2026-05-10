@@ -48,8 +48,8 @@ local function curl(url, method, body)
 end
 
 local m = require("md-preview")
-m.state.port = 9999
-m.setup({ auto_position = false })
+local ipc = require("md-preview.ipc")
+m.setup({ port = 9999, auto_position = false })
 
 m.open("dark")
 step("M.open returned without error", m.is_alive(),
@@ -97,8 +97,7 @@ step("re-rendered body contains the edit",
 
 m.on_cursor_moved()
 local cursor_ok = vim.wait(500, function()
-  return not m.state.debounce_timer
-    or not pcall(function() return m.state.debounce_timer:is_closing() == false end)
+  return not ipc.has_pending_timer()
 end, 50)
 step("cursor-move debounce fires and clears timer", cursor_ok)
 

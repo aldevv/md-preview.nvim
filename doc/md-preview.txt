@@ -1,0 +1,122 @@
+*md-preview.txt*  Scroll-synced markdown preview for Neovim
+
+Author:     aldevv
+License:    MIT
+Repository: https://github.com/aldevv/md-preview.nvim
+Renderer:   https://github.com/aldevv/md-preview
+
+==============================================================================
+CONTENTS                                                  *md-preview-contents*
+
+  1. Overview ......................................... |md-preview-overview|
+  2. Setup ............................................ |md-preview-setup|
+  3. Commands ......................................... |md-preview-commands|
+  4. Default keymaps .................................. |md-preview-keymaps|
+  5. Health ........................................... |md-preview-health|
+  6. Requirements ..................................... |md-preview-requirements|
+
+==============================================================================
+1. OVERVIEW                                               *md-preview-overview*
+
+md-preview.nvim drives the `mdp` Go binary to provide a scroll-synced
+markdown preview in a Chrome `--app=` window. The plugin spawns one server
+per Neovim session (single-instance) and talks to it over stdin:
+`render` on save, `scroll` on cursor move (debounced 50ms), `quit` on close.
+
+Re-opening the preview while a server is already running sends a `render`
+message instead of spawning a new server, so the same Chrome window is
+reused as you switch between markdown files.
+
+==============================================================================
+2. SETUP                                                     *md-preview-setup*
+
+>lua
+    require("md-preview").setup({
+      auto_position = true,
+      keymaps       = true,
+      colemak       = false,
+      port          = 9753,
+      terminal_app  = "kitty",
+    })
+<
+
+Options (all optional; defaults shown above):
+
+`auto_position`     boolean. Tile terminal + browser side-by-side. macOS
+                    uses AppleScript to resize `terminal_app` and Chrome.
+                    Linux relies on the WM — xmonad / dwm / i3 / sway /
+                    bspwm / awesome / hyprland / river / qtile auto-tile;
+                    unknown WMs skip positioning.
+
+`keymaps`           boolean or table. `true` registers the three leader
+                    keymaps in |md-preview-keymaps|. `false` skips
+                    registration entirely. A table overrides individual
+                    keys (set a value to `false` to skip just that one
+                    binding) and merges with defaults.
+
+`colemak`           boolean. Sets `MDP_COLEMAK=1` in the server env so the
+                    in-page nav keys become n/e/i instead of j/k/l.
+
+`port`              integer. Port the `mdp serve` HTTP/WS server binds to.
+                    Set per-session if you want two Neovim instances to
+                    preview at the same time.
+
+`terminal_app`      string. macOS only. AppleScript process name to tile
+                    beside Chrome (alacritty, wezterm, iTerm2, Terminal,
+                    Ghostty, …). The terminal-resize step is wrapped in
+                    `try`/`on error`, so a wrong name silently skips the
+                    resize rather than erroring.
+
+`setup()` is idempotent: opts can be merged on subsequent calls but side
+effects (platform detection, keymap registration, user-command
+registration) run only once.
+
+==============================================================================
+3. COMMANDS                                               *md-preview-commands*
+
+                                                          *:MdPreviewInstall*
+:MdPreviewInstall   Download the `mdp` binary by running the canonical
+                    install.sh from the renderer repo. Idempotent — does
+                    nothing if `mdp` is already on `$PATH`. Recommended as
+                    the plugin-spec `build` value:
+>lua
+    { "aldevv/md-preview.nvim", build = ":MdPreviewInstall" }
+<
+
+==============================================================================
+4. DEFAULT KEYMAPS                                         *md-preview-keymaps*
+
+    <leader>mv   open dark preview
+    <leader>mV   open light preview
+    <leader>mq   close preview
+
+Override individual bindings via the `keymaps` opt (see |md-preview-setup|).
+
+==============================================================================
+5. HEALTH                                                   *md-preview-health*
+
+                                                  *:checkhealth-md-preview*
+Run `:checkhealth md-preview` to verify dependencies and surface the
+detected window manager / Wayland status:
+
+  - `mdp` binary on `$PATH`
+  - `curl` and `sh` (used by |:MdPreviewInstall|)
+  - Chromium-family browser
+  - `xdotool` / `wmctrl` (Linux: window close)
+  - `lsof` (Linux: orphan-server detection)
+  - Detected WM (and whether it auto-tiles)
+  - Wayland session indicator
+
+==============================================================================
+6. REQUIREMENTS                                       *md-preview-requirements*
+
+  - Neovim >= 0.9
+  - `mdp` binary on `$PATH` (see |:MdPreviewInstall|)
+  - A Chromium-family browser (google-chrome / chromium / chromium-browser)
+  - macOS or Linux (native Windows is not supported; WSL works)
+  - Optional: xdotool or wmctrl on Linux to close the preview window
+    cleanly. On a pure Wayland session where neither tool can see the
+    `--app=` window, you'll see a warning and need to close manually.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

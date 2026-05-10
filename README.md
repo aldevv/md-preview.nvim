@@ -9,15 +9,17 @@ The renderer/server lives in a separate repo: [aldevv/md-preview](https://github
 ```lua
 {
   "aldevv/md-preview.nvim",
-  ft = { "markdown" },
-  build = "curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh",
+  ft    = { "markdown" },
+  build = ":MdPreviewInstall",
   config = function()
     require("md-preview").setup()
   end,
 }
 ```
 
-`build` runs once at install/update time and drops the prebuilt `mdp` binary into `$HOME/.local/bin` (override with `PREFIX=...`). If you skip `build`, `setup()` will warn that `mdp` isn't on `PATH` and prompt you to run `:MdPreviewInstall`, which invokes the same script. You can also install manually:
+`build` runs once at install/update time. `:MdPreviewInstall` is the user command the plugin registers in `setup()`; it shells out to the same `install.sh` as the manual one-liner below, dropping the prebuilt `mdp` binary into `$HOME/.local/bin` (override with `PREFIX=...`). The raw-curl form (`build = "curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh"`) also works if you'd rather not rely on the user command.
+
+If you skip `build`, `setup()` warns that `mdp` isn't on `PATH` and prompts you to run `:MdPreviewInstall`. You can also install manually:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh
@@ -40,9 +42,11 @@ While open, `BufWritePost` re-renders, `CursorMoved` syncs scroll (debounced), `
 
 ```lua
 require("md-preview").setup({
-  auto_position = true,   -- tile terminal + browser side-by-side (macOS / known WMs)
-  keymaps       = true,   -- true = defaults below | false = none | table = overrides
-  colemak       = false,  -- swap in-page nav keys j/k/l → n/e/i (h, d/u, g/G unchanged)
+  auto_position = true,    -- tile terminal + browser side-by-side (macOS / known WMs)
+  keymaps       = true,    -- true = defaults below | false = none | table = overrides
+  colemak       = false,   -- swap in-page nav keys j/k/l → n/e/i (h, d/u, g/G unchanged)
+  port          = 9753,    -- port the `mdp serve` HTTP/WS server binds to
+  terminal_app  = "kitty", -- macOS only: AppleScript process name to tile beside Chrome
 })
 ```
 
@@ -78,9 +82,11 @@ The `mdp` binary reads `~/.config/md-preview/config.toml`. See the [md-preview R
 
 ## Requirements
 
-- The `mdp` binary on `PATH` — auto-installed via `go install` if Go is available, otherwise install via the [one-liner](https://github.com/aldevv/md-preview#install).
-- Any web browser. If `google-chrome` / `chromium` is on `PATH`, `mdp` opens it with `--app=` for a chromeless window; otherwise it falls back to `xdg-open` (Linux) or `open` (macOS).
-- `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional).
+- **Neovim ≥ 0.9** (uses `vim.uv or vim.loop`, `vim.json.encode`, `vim.api.nvim_create_augroup{ clear = true }`, `vim.keymap.set`).
+- The `mdp` binary on `PATH` — fetched as a prebuilt binary by [`install.sh`](https://github.com/aldevv/md-preview/blob/main/install.sh) (no Go toolchain required). Run `:MdPreviewInstall` from inside Neovim, or wire it as the lazy.nvim `build` step shown above.
+- A Chromium-family browser for the chromeless `--app=` window. On Linux, `mdp` looks for `google-chrome` / `chromium` / `chromium-browser` and falls back to `xdg-open` if none are on `PATH`.
+- `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional). On a pure Wayland session where neither tool can see the window, you'll get a warning and need to close it manually.
+- **Native Windows is not supported.** WSL works (it's Linux from Neovim's perspective).
 
 ## Tests
 
