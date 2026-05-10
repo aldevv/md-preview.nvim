@@ -1,20 +1,14 @@
 local function snapshot_fn()
   return {
     executable = vim.fn.executable,
-    isdirectory = vim.fn.isdirectory,
-    mkdir = vim.fn.mkdir,
-    system = vim.fn.system,
-    expand = vim.fn.expand,
+    jobstart = vim.fn.jobstart,
     notify = vim.notify,
   }
 end
 
 local function restore_fn(saved)
   vim.fn.executable = saved.executable
-  vim.fn.isdirectory = saved.isdirectory
-  vim.fn.mkdir = saved.mkdir
-  vim.fn.system = saved.system
-  vim.fn.expand = saved.expand
+  vim.fn.jobstart = saved.jobstart
   vim.notify = saved.notify
 end
 
@@ -25,29 +19,21 @@ end
 
 describe("install_cli", function()
   local saved
-  local calls
+  local jobstart_calls
   local notifications
-
-  -- fail_when is a sentinel: tests set it to argv[1] (e.g. "sh") to make
-  -- the next stubbed system() call resolve via a real failing shell command,
-  -- which sets vim.v.shell_error without writing to it.
-  local fail_when
 
   before_each(function()
     saved = snapshot_fn()
-    calls = {}
+    jobstart_calls = {}
     notifications = {}
-    fail_when = nil
 
-    vim.fn.isdirectory = function() return 1 end
-    vim.fn.mkdir = function() end
-    vim.fn.expand = function(s) return (s:gsub("^~", "/HOME")) end
-    vim.fn.system = function(argv)
-      table.insert(calls, argv)
-      if type(argv) == "table" and fail_when == argv[1] then
-        return saved.system("false")
-      end
-      return saved.system("true")
+    -- Default jobstart stub: record the call and return a fake non-zero
+    -- channel id so install_cli treats it as successfully scheduled. The
+    -- on_exit / on_stderr callbacks are NOT auto-fired here — tests that
+    -- want to simulate completion invoke them through the captured opts.
+    vim.fn.jobstart = function(argv, opts)
+      table.insert(jobstart_calls, { argv = argv, opts = opts })
+      return 1
     end
     vim.notify = function(msg, level)
       table.insert(notifications, { msg = msg, level = level })
@@ -58,11 +44,12 @@ describe("install_cli", function()
     restore_fn(saved)
   end)
 
-  local function had_shell_call_matching(substr)
-    for _, argv in ipairs(calls) do
+  local function had_jobstart_matching(substr)
+    for _, call in ipairs(jobstart_calls) do
+      local argv = call.argv
       if type(argv) == "table" and argv[1] == "sh"
          and type(argv[3]) == "string" and argv[3]:find(substr, 1, true) then
-        return true, argv
+        return true, call
       end
     end
     return false
@@ -85,8 +72,8 @@ describe("install_cli", function()
     fresh_plugin().install_cli()
     assert(notified_with("mdp binary not found"),
       "expected 'mdp binary not found' notification")
-    assert(not had_shell_call_matching("install.sh"),
-      "install.sh should not be invoked when curl is missing")
+    assert(#jobstart_calls == 0,
+      "jobstart should not be invoked when curl is missing")
   end)
 
   it("stays silent when mdp is already on PATH", function()
@@ -97,27 +84,61 @@ describe("install_cli", function()
     fresh_plugin().install_cli()
     assert(not notified_with("mdp binary not found"),
       "should not warn when mdp is on PATH")
-    assert(#calls == 0, "no shell-out should happen when mdp is on PATH")
+    assert(#jobstart_calls == 0, "no jobstart should happen when mdp is on PATH")
   end)
 
-  it("runs install.sh via curl|sh when mdp missing and curl available", function()
+  it("schedules install.sh via jobstart when mdp missing and curl available", function()
     vim.fn.executable = function(p)
       if p == "curl" or p == "sh" then return 1 end
       return 0
     end
     fresh_plugin().install_cli()
-    local ok, argv = had_shell_call_matching("aldevv/md-preview/main/install.sh")
-    assert(ok, "expected `sh -c 'curl … install.sh | sh'` invocation, got " .. vim.inspect(calls))
-    assert(argv[2] == "-c", "second arg should be -c; got " .. tostring(argv[2]))
+    local ok, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
+    assert(ok, "expected jobstart with curl|sh invocation, got " .. vim.inspect(jobstart_calls))
+    assert(call.argv[2] == "-c", "second arg should be -c; got " .. tostring(call.argv[2]))
+    assert(type(call.opts) == "table", "expected opts table for jobstart")
+    assert(type(call.opts.on_exit) == "function", "expected on_exit callback")
+    assert(type(call.opts.on_stderr) == "function", "expected on_stderr callback")
   end)
 
-  it("surfaces install failures via err()", function()
+  it("notifies success on exit code 0", function()
     vim.fn.executable = function(p)
       if p == "curl" or p == "sh" then return 1 end
       return 0
     end
-    fail_when = "sh"
     fresh_plugin().install_cli()
-    assert(notified_with("install failed"), "expected install failure notification")
+    local _, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
+    call.opts.on_exit(0, 0)
+    assert(notified_with("mdp installed"),
+      "expected success notification after on_exit(0)")
+  end)
+
+  it("surfaces install failures via err() in on_exit", function()
+    vim.fn.executable = function(p)
+      if p == "curl" or p == "sh" then return 1 end
+      return 0
+    end
+    fresh_plugin().install_cli()
+    local _, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
+    call.opts.on_stderr(0, { "curl: (6) Could not resolve host" })
+    call.opts.on_exit(0, 7)
+    assert(notified_with("install failed"),
+      "expected install failure notification")
+    assert(notified_with("Could not resolve host"),
+      "expected stderr to be surfaced in failure notification")
+  end)
+
+  it("surfaces jobstart scheduling failure (return <= 0)", function()
+    vim.fn.executable = function(p)
+      if p == "curl" or p == "sh" then return 1 end
+      return 0
+    end
+    vim.fn.jobstart = function(argv, opts)
+      table.insert(jobstart_calls, { argv = argv, opts = opts })
+      return -1
+    end
+    fresh_plugin().install_cli()
+    assert(notified_with("install failed: jobstart returned -1"),
+      "expected jobstart failure notification")
   end)
 end)

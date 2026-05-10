@@ -145,9 +145,11 @@ end
 -- a prebuilt release binary (no Go toolchain needed). Only requirement
 -- is curl + sh, which any system we'd run on already has.
 --
--- Invoked via :MdPreviewInstall, or directly from a plugin spec's build
--- step (e.g. `build = ":MdPreviewInstall"` in lazy.nvim). NOT called from
--- setup() — startup is not the right place for a one-shot install.
+-- Runs the curl|sh download asynchronously via jobstart so nvim doesn't
+-- freeze during the download. Invoked via :MdPreviewInstall, or from a
+-- plugin spec's build step (e.g. `build = ":MdPreviewInstall"` in
+-- lazy.nvim). NOT called from setup() — startup is not the right place
+-- for a one-shot install.
 function M.install_cli()
   if vim.fn.executable("mdp") == 1 then return end
 
@@ -157,9 +159,27 @@ function M.install_cli()
   end
 
   info("Installing mdp from github.com/aldevv/md-preview…")
-  local out = vim.fn.system({ "sh", "-c", "curl -fsSL " .. INSTALL_SCRIPT_URL .. " | sh" })
-  if vim.v.shell_error ~= 0 then
-    err("install failed: " .. (out or "") .. "\n" .. INSTALL_HINT)
+  local stderr_lines = {}
+  local job = vim.fn.jobstart(
+    { "sh", "-c", "curl -fsSL " .. INSTALL_SCRIPT_URL .. " | sh" },
+    {
+      stderr_buffered = true,
+      on_stderr = function(_, data)
+        for _, line in ipairs(data or {}) do
+          if line ~= "" then table.insert(stderr_lines, line) end
+        end
+      end,
+      on_exit = function(_, code)
+        if code == 0 then
+          info("mdp installed")
+        else
+          err("install failed: " .. table.concat(stderr_lines, "\n") .. "\n" .. INSTALL_HINT)
+        end
+      end,
+    }
+  )
+  if job <= 0 then
+    err("install failed: jobstart returned " .. tostring(job) .. "\n" .. INSTALL_HINT)
   end
 end
 
