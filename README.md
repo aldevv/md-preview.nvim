@@ -4,6 +4,8 @@ Scroll-synced markdown preview for Neovim. Re-renders on save, follows your curs
 
 The renderer/server lives in a separate repo: [aldevv/md-preview](https://github.com/aldevv/md-preview). This plugin spawns the `mdp` binary and talks to it over stdin.
 
+https://github.com/user-attachments/assets/cfb8d79b-0592-4bb3-a705-b45ecf26cdd3
+
 ## Install (lazy.nvim)
 
 ```lua
