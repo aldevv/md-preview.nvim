@@ -70,10 +70,15 @@ require("md-preview").setup({
 })
 ```
 
-Disable all keymap registration:
+Disable all keymap registration and bind manually:
 
 ```lua
 require("md-preview").setup({ keymaps = false })
+
+local mdp = require("md-preview")
+vim.keymap.set("n", "<leader>mv", function() mdp.open("dark")  end, { desc = "md-preview: open (dark)" })
+vim.keymap.set("n", "<leader>mV", function() mdp.open("light") end, { desc = "md-preview: open (light)" })
+vim.keymap.set("n", "<leader>mq", function() mdp.close()       end, { desc = "md-preview: close" })
 ```
 
 ## CLI config
