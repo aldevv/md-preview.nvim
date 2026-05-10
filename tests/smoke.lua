@@ -79,9 +79,9 @@ vim.cmd("e!")
 m.on_save()
 
 local bumped = vim.wait(1500, function()
-  local body, code = curl("http://localhost:9999/reload")
-  if code ~= 0 or not body then return false end
-  local ver = tonumber(body:match('"version":(%d+)'))
+  local reload, code = curl("http://localhost:9999/reload")
+  if code ~= 0 or not reload then return false end
+  local ver = tonumber(reload:match('"version":(%d+)'))
   return ver and ver1 and ver > tonumber(ver1)
 end, 50)
 step("on_save bumps version on the server", bumped)

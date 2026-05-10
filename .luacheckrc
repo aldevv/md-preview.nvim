@@ -14,5 +14,7 @@ files["tests/"] = {
   ignore = { "212/_.*", "213" },
 }
 
--- Suppress: 631 = "line is too long" (matches stylua's 140 column).
-max_line_length = 140
+-- 631 = "line is too long". Stylua wraps Lua at 140, but the AppleScript
+-- template inside browser.lua is an embedded string stylua doesn't reflow —
+-- 160 gives that one line headroom without losing the rule for real Lua.
+max_line_length = 160
