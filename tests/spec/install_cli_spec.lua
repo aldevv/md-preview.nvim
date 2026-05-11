@@ -67,14 +67,26 @@ describe("install_cli", function()
     assert(#jobstart_calls == 0, "jobstart should not be invoked when curl is missing")
   end)
 
-  it("stays silent when mdp is already on PATH", function()
+  it("stays silent when the in-tree mdp is already installed", function()
+    local paths = require("md-preview.paths")
+    local in_tree = paths.mdp_bin()
     vim.fn.executable = function(p)
-      if p == "mdp" then return 1 end
+      if p == in_tree then return 1 end
       return 0
     end
     fresh_plugin().install_cli()
-    assert(not notified_with("mdp binary not found"), "should not warn when mdp is on PATH")
-    assert(#jobstart_calls == 0, "no jobstart should happen when mdp is on PATH")
+    assert(not notified_with("mdp binary not found"), "should not warn when in-tree mdp exists")
+    assert(#jobstart_calls == 0, "no jobstart should happen when in-tree mdp exists")
+  end)
+
+  it("re-installs even when mdp is on PATH (we want the in-tree copy)", function()
+    vim.fn.executable = function(p)
+      if p == "mdp" or p == "curl" or p == "sh" then return 1 end
+      return 0
+    end
+    fresh_plugin().install_cli()
+    local ok = had_jobstart_matching("aldevv/md-preview/main/install.sh")
+    assert(ok, "expected jobstart even when mdp is on PATH, got " .. vim.inspect(jobstart_calls))
   end)
 
   it("schedules install.sh via jobstart when mdp missing and curl available", function()

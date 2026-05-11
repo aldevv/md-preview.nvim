@@ -19,15 +19,15 @@ https://github.com/user-attachments/assets/cfb8d79b-0592-4bb3-a705-b45ecf26cdd3
 }
 ```
 
-`build` runs once at install/update time. `:MdPreviewInstall` is the user command the plugin registers in `setup()`; it shells out to the same `install.sh` as the manual one-liner below, dropping the prebuilt `mdp` binary into `$HOME/.local/bin` (override with `PREFIX=...`). The raw-curl form (`build = "curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh"`) also works if you'd rather not rely on the user command.
+`build` runs once at install/update time. `:MdPreviewInstall` drops the prebuilt `mdp` binary into the plugin's own directory (`<plugin_dir>/bin/mdp`, typically `~/.local/share/nvim/lazy/md-preview.nvim/bin/mdp`); nothing is added to your `$PATH`.
 
-If you skip `build`, `setup()` warns that `mdp` isn't on `PATH` and prompts you to run `:MdPreviewInstall`. You can also install manually:
+You can also install system-wide:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aldevv/md-preview/main/install.sh | sh
 ```
 
-(`~/.local/bin` must be on your `PATH` — most distros pre-add it; otherwise add `export PATH="$HOME/.local/bin:$PATH"` to your shell rc.)
+This drops the binary into `$HOME/.local/bin` (override with `PREFIX=...`); make sure that's on your `$PATH`.
 
 ## Usage
 
@@ -90,7 +90,7 @@ The `mdp` binary reads `~/.config/md-preview/config.toml`. See the [md-preview R
 ## Requirements
 
 - **Neovim ≥ 0.9** (uses `vim.uv or vim.loop`, `vim.json.encode`, `vim.api.nvim_create_augroup{ clear = true }`, `vim.keymap.set`).
-- The `mdp` binary on `PATH` — installed by [`install.sh`](https://github.com/aldevv/md-preview/blob/main/install.sh), which uses `go install` if Go is available and otherwise downloads a prebuilt release binary. Run `:MdPreviewInstall` from inside Neovim, or wire it as the lazy.nvim `build` step shown above.
+- The `mdp` binary, installed by [`install.sh`](https://github.com/aldevv/md-preview/blob/main/install.sh). Run `:MdPreviewInstall` from inside Neovim, or wire it as the lazy.nvim `build` step shown above.
 - A Chromium-family browser for the chromeless `--app=` window. On Linux, `mdp` looks for `google-chrome` / `chromium` / `chromium-browser` and falls back to `xdg-open` if none are on `PATH`.
 - `xdotool` or `wmctrl` on Linux for closing the synced preview window cleanly (optional). On a pure Wayland session where neither tool can see the window, you'll get a warning and need to close it manually.
 - **Native Windows is not supported.** WSL works (it's Linux from Neovim's perspective).

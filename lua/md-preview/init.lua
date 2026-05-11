@@ -4,6 +4,7 @@
 local store = require("md-preview.state")
 local notify = require("md-preview.notify")
 local platform = require("md-preview.platform")
+local paths = require("md-preview.paths")
 local ipc = require("md-preview.ipc")
 local server = require("md-preview.server")
 
@@ -50,14 +51,10 @@ function M.setup(opts)
 
   -- Passive nudge — startup is not the place for shell-out install work;
   -- the plugin spec's `build = ...` step is.
-  if vim.fn.executable("mdp") == 0 then
-    local install = require("md-preview.install")
+  if not paths.mdp_available() then
     notify.warn(
       "mdp not found. Run :MdPreviewInstall, or add "
-        .. '`build = ":MdPreviewInstall"` to your plugin spec '
-        .. '(or `build = "curl -fsSL '
-        .. install.SCRIPT_URL
-        .. ' | sh"`).'
+        .. '`build = ":MdPreviewInstall"` to your plugin spec.'
     )
   end
 end
@@ -88,7 +85,8 @@ function M.open(theme)
   -- A previous nvim session may have left a server bound to our port.
   server.clear_stale(M.opts.port)
 
-  if vim.fn.executable("mdp") == 0 then
+  local mdp = paths.resolve_mdp()
+  if not mdp then
     notify.err(require("md-preview.install").HINT)
     return
   end
@@ -96,7 +94,7 @@ function M.open(theme)
   local job_env = nil
   if M.opts.colemak then job_env = { MDP_COLEMAK = "1" } end
 
-  M.state.job_id = vim.fn.jobstart({ "mdp", "serve", file, tostring(M.opts.port), theme }, {
+  M.state.job_id = vim.fn.jobstart({ mdp, "serve", file, tostring(M.opts.port), theme }, {
     stdin = "pipe",
     stdout_buffered = false,
     stderr_buffered = false,
