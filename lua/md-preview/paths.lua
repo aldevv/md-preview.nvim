@@ -13,9 +13,7 @@ function M.plugin_root()
   return _root
 end
 
-function M.mdp_bin()
-  return M.plugin_root() .. "/bin/mdp"
-end
+function M.mdp_bin() return M.plugin_root() .. "/bin/mdp" end
 
 function M.resolve_mdp()
   local in_tree = M.mdp_bin()
@@ -24,8 +22,6 @@ function M.resolve_mdp()
   return nil
 end
 
-function M.mdp_available()
-  return M.resolve_mdp() ~= nil
-end
+function M.mdp_available() return M.resolve_mdp() ~= nil end
 
 return M

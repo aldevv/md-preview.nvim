@@ -52,10 +52,7 @@ function M.setup(opts)
   -- Passive nudge — startup is not the place for shell-out install work;
   -- the plugin spec's `build = ...` step is.
   if not paths.mdp_available() then
-    notify.warn(
-      "mdp not found. Run :MdPreviewInstall, or add "
-        .. '`build = ":MdPreviewInstall"` to your plugin spec.'
-    )
+    notify.warn("mdp not found. Run :MdPreviewInstall, or add " .. '`build = ":MdPreviewInstall"` to your plugin spec.')
   end
 end
 
