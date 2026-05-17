@@ -7,6 +7,7 @@ local platform = require("md-preview.platform")
 local paths = require("md-preview.paths")
 local ipc = require("md-preview.ipc")
 local server = require("md-preview.server")
+local navigate = require("md-preview.navigate")
 
 local M = {}
 
@@ -98,7 +99,14 @@ function M.open(theme)
     env = job_env,
     on_stdout = function(_, data)
       for _, line in ipairs(data) do
-        if line ~= "" then notify.log(line) end
+        if line ~= "" then
+          local nav_path = navigate.parse(line)
+          if nav_path then
+            navigate.follow(nav_path)
+          else
+            notify.log(line)
+          end
+        end
       end
     end,
     on_stderr = function(_, data)
