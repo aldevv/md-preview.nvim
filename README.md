@@ -44,11 +44,12 @@ While open, `BufWritePost` re-renders, `CursorMoved` syncs scroll (debounced), `
 
 ```lua
 require("md-preview").setup({
-  auto_position = true,    -- tile terminal + browser side-by-side (macOS / known WMs)
-  keymaps       = true,    -- true = defaults below | false = none | table = overrides
-  colemak       = false,   -- swap in-page nav keys j/k/l → n/e/i (h, d/u, g/G unchanged)
-  port          = 9753,    -- port the `mdp serve` HTTP/WS server binds to
-  terminal_app  = "kitty", -- macOS only: AppleScript process name to tile beside Chrome
+  auto_position    = true,    -- tile terminal + browser side-by-side (macOS / known WMs)
+  keymaps          = true,    -- true = defaults below | false = none | table = overrides
+  colemak          = false,   -- swap in-page nav keys j/k/l → n/e/i (h, d/u, g/G unchanged)
+  port             = 9753,    -- port the `mdp serve` HTTP/WS server binds to
+  terminal_app     = "kitty", -- macOS only: AppleScript process name to tile beside Chrome
+  prefer_global_mdp = false,  -- true: prefer the global `mdp` on $PATH over <plugin_root>/bin/mdp
 })
 ```
 
