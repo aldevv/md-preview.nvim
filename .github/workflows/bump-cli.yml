@@ -1,0 +1,100 @@
+name: Bump pinned CLI version
+
+# Triggered by a repository_dispatch event fired from aldevv/md-preview's
+# release workflow whenever that repo cuts a new release. The dispatch carries
+# the new CLI tag in client_payload.version (e.g. "v0.2.0"). This workflow
+# rewrites mdp-version.txt with that tag, bumps the plugin's own patch version,
+# commits, tags, and publishes a GitHub release so lazy.nvim users pull a
+# matching mdp binary on their next update.
+
+on:
+  repository_dispatch:
+    types: [cli-release]
+  # Manual fallback: trigger from the Actions tab, supplying the CLI tag.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "CLI tag to pin (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve new CLI version
+        id: cli
+        run: |
+          version="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          case "$version" in
+            v*) ;;
+            "" ) echo "::error::no version supplied"; exit 1 ;;
+            *) version="v$version" ;;
+          esac
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+      - name: Short-circuit if already pinned
+        id: check
+        run: |
+          current="$(tr -d '[:space:]' <mdp-version.txt 2>/dev/null || true)"
+          if [ "$current" = "${{ steps.cli.outputs.version }}" ]; then
+            echo "already pinned to $current — nothing to do"
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next plugin tag (patch bump)
+        if: steps.check.outputs.skip != 'true'
+        id: plugin
+        run: |
+          git fetch --tags --force
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
+          if [ -z "$latest" ]; then
+            next="v0.1.0"
+          else
+            IFS='.' read -r major minor patch <<<"${latest#v}"
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "next=$next" >>"$GITHUB_OUTPUT"
+          echo "previous=$latest" >>"$GITHUB_OUTPUT"
+
+      - name: Write mdp-version.txt, commit, tag, push
+        if: steps.check.outputs.skip != 'true'
+        env:
+          CLI_VERSION: ${{ steps.cli.outputs.version }}
+          PLUGIN_VERSION: ${{ steps.plugin.outputs.next }}
+        run: |
+          set -euo pipefail
+          echo "$CLI_VERSION" >mdp-version.txt
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mdp-version.txt
+          git commit -m "chore: pin mdp CLI to $CLI_VERSION"
+          git tag -a "$PLUGIN_VERSION" -m "Pin mdp CLI to $CLI_VERSION"
+          git push origin HEAD
+          git push origin "$PLUGIN_VERSION"
+
+      - name: Publish GitHub release
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLI_VERSION: ${{ steps.cli.outputs.version }}
+          PLUGIN_VERSION: ${{ steps.plugin.outputs.next }}
+          PREVIOUS: ${{ steps.plugin.outputs.previous }}
+        run: |
+          notes="Pins mdp CLI to **$CLI_VERSION** ([release notes](https://github.com/aldevv/md-preview/releases/tag/$CLI_VERSION))."
+          if [ -n "$PREVIOUS" ]; then
+            notes="$notes\n\nPlugin diff: https://github.com/${{ github.repository }}/compare/$PREVIOUS...$PLUGIN_VERSION"
+          fi
+          printf "%b\n" "$notes" >/tmp/release-notes.md
+          gh release create "$PLUGIN_VERSION" \
+            --title "$PLUGIN_VERSION" \
+            --notes-file /tmp/release-notes.md

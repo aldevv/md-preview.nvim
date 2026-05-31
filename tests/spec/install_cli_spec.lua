@@ -2,13 +2,16 @@ local function snapshot_fn()
   return {
     executable = vim.fn.executable,
     jobstart = vim.fn.jobstart,
+    system = vim.fn.system,
     notify = vim.notify,
+    shell_error = vim.v.shell_error,
   }
 end
 
 local function restore_fn(saved)
   vim.fn.executable = saved.executable
   vim.fn.jobstart = saved.jobstart
+  vim.fn.system = saved.system
   vim.notify = saved.notify
 end
 
@@ -67,16 +70,36 @@ describe("install_cli", function()
     assert(#jobstart_calls == 0, "jobstart should not be invoked when curl is missing")
   end)
 
-  it("stays silent when the in-tree mdp is already installed", function()
+  it("stays silent when the in-tree mdp matches the pinned version", function()
     local paths = require("md-preview.paths")
+    local install = require("md-preview.install")
     local in_tree = paths.mdp_bin()
+    local pinned = install.pinned_version() or "v0.0.0"
     vim.fn.executable = function(p)
       if p == in_tree then return 1 end
       return 0
     end
+    vim.fn.system = function(argv)
+      if type(argv) == "table" and argv[1] == in_tree and argv[2] == "version" then return pinned end
+      return ""
+    end
     fresh_plugin().install_cli()
-    assert(not notified_with("mdp binary not found"), "should not warn when in-tree mdp exists")
-    assert(#jobstart_calls == 0, "no jobstart should happen when in-tree mdp exists")
+    assert(not notified_with("mdp binary not found"), "should not warn when in-tree mdp matches pin")
+    assert(#jobstart_calls == 0, "no jobstart should happen when in-tree mdp matches pin")
+  end)
+
+  it("re-installs when the in-tree mdp is at a different version than the pin", function()
+    local paths = require("md-preview.paths")
+    local in_tree = paths.mdp_bin()
+    vim.fn.executable = function(p)
+      if p == in_tree or p == "curl" or p == "sh" then return 1 end
+      return 0
+    end
+    vim.fn.system = function() return "v0.0.1-stale" end
+    fresh_plugin().install_cli()
+    local ok, call = had_jobstart_matching("aldevv/md-preview/main/install.sh")
+    assert(ok, "expected jobstart when in-tree mdp version does not match pin")
+    assert(call.argv[3]:find("MDP_VERSION=", 1, true), "expected MDP_VERSION to be passed to install.sh")
   end)
 
   it("re-installs even when mdp is on PATH (we want the in-tree copy)", function()

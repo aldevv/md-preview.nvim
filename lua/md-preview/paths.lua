@@ -1,5 +1,9 @@
--- `:MdPreviewInstall` drops mdp at <plugin_root>/bin/mdp; resolve_mdp
--- prefers that copy and falls back to `mdp` on $PATH.
+-- `:MdPreviewInstall` drops mdp at <plugin_root>/bin/mdp; by default
+-- resolve_mdp prefers that copy and falls back to `mdp` on $PATH. Set
+-- `prefer_global_mdp = true` in setup() to flip the order so a globally
+-- installed mdp on $PATH wins over the pinned in-tree binary.
+
+local store = require("md-preview.state")
 
 local M = {}
 
@@ -17,8 +21,15 @@ function M.mdp_bin() return M.plugin_root() .. "/bin/mdp" end
 
 function M.resolve_mdp()
   local in_tree = M.mdp_bin()
-  if vim.fn.executable(in_tree) == 1 then return in_tree end
-  if vim.fn.executable("mdp") == 1 then return "mdp" end
+  local in_tree_ok = vim.fn.executable(in_tree) == 1
+  local path_ok = vim.fn.executable("mdp") == 1
+  if store.opts.prefer_global_mdp then
+    if path_ok then return "mdp" end
+    if in_tree_ok then return in_tree end
+  else
+    if in_tree_ok then return in_tree end
+    if path_ok then return "mdp" end
+  end
   return nil
 end
 
