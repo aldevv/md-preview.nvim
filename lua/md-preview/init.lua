@@ -115,7 +115,8 @@ function M.open(theme)
       end
     end,
     on_exit = function(job, code)
-      if code ~= 0 then notify.err("Server exited with code " .. code) end
+      -- 143 = SIGTERM from our jobstop in M.close() racing the quit message; not an error.
+      if code ~= 0 and code ~= 143 then notify.err("Server exited with code " .. code) end
       -- Old job's on_exit can fire after respawn has set a new job_id;
       -- guard against clobbering the live server's id.
       if M.state.job_id == job then M.state.job_id = nil end
